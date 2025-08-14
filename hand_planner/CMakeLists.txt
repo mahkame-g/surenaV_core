@@ -58,20 +58,28 @@ find_package(catkin REQUIRED COMPONENTS
  )
 
 ## Generate services in the 'srv' folder
- add_service_files(
-   FILES
-   move_hand_single.srv
-   move_hand_both.srv
-   gripOnline.srv
-   home_service.srv
-   SetTargetClass.srv
- )
+add_service_files(
+  FILES
+  move_hand_single.srv
+  move_hand_both.srv
+  gripOnline.srv
+  home_service.srv
+  SetTargetClass.srv
+)
 
 ## Generate added messages and services with any dependencies listed here
- generate_messages(
-   DEPENDENCIES
-   std_msgs
- )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
+
+
+catkin_package(
+  INCLUDE_DIRS include
+  LIBRARIES hand_planner_lib
+  CATKIN_DEPENDS roscpp std_msgs message_runtime
+  DEPENDS Eigen3
+)
 
 ###########
 ## Build ##
@@ -85,31 +93,17 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )
 
-## Declare a C++ library
-add_library(hand_planner_lib
-  src/HandManager.cpp
-  src/S5_hand.cpp
-  src/S5_hand_jacobian.cpp
-  src/MinimumJerkInterpolation.cpp 
-  src/head_code.cpp
-  # Add other .cpp files if they are part of the library
-)
+## Declare Executable C++ Libraries and ROS Nodes
+file(GLOB HAND_PLANNER_SOURCES "src/*.cpp")
 
-target_link_libraries(hand_planner_lib
-  ${catkin_LIBRARIES}
-)
+add_library(hand_planner_lib ${HAND_PLANNER_SOURCES})
+add_dependencies(hand_planner_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(hand_planner_lib ${catkin_LIBRARIES})
 
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES hand_planner_lib
-  CATKIN_DEPENDS roscpp std_msgs
-  DEPENDS Eigen3
-)
-
-
-# add_executable(hand_manager_node src/HandManager.cpp src/S5_hand.cpp src/S5_hand_jacobian.cpp src/MinimumJerkInterpolation.cpp)
-# target_link_libraries(hand_manager_node ${catkin_LIBRARIES})
-# add_dependencies(hand_manager_node hand_planner_gencpp)
+# add_executable(hand_planner_node ${HAND_PLANNER_SOURCES})
+# target_link_libraries(hand_planner_node ${catkin_LIBRARIES})
+# add_dependencies(hand_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_executable(head_sub src/head_code.cpp)
+add_dependencies(head_sub ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(head_sub ${catkin_LIBRARIES})

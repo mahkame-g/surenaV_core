@@ -112,7 +112,7 @@ generate_messages(
 catkin_package(
  INCLUDE_DIRS include
  LIBRARIES gait_planner_lib
- CATKIN_DEPENDS roscpp rospy std_msgs
+ CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
  DEPENDS Eigen3
 #  DEPENDS system_lib
 )
@@ -214,26 +214,14 @@ include_directories(
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
+
+## Declare Executable C++ Libraries and ROS Nodes
 file(GLOB GAIT_PLANNER_SOURCES "src/*.cpp")
 
-add_library(gait_planner_lib
-  ${GAIT_PLANNER_SOURCES}
-)
+add_library(gait_planner_lib ${GAIT_PLANNER_SOURCES})
+add_dependencies(gait_planner_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(gait_planner_lib ${catkin_LIBRARIES})
 
-target_link_libraries(gait_planner_lib
-  ${catkin_LIBRARIES}
-)
-
-# file(GLOB SOURCES "src/*.cpp")
-# add_library(${PROJECT_NAME} ${SOURCES})
-# add_executable(gait_planner_node ${SOURCES})
-
-# target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
+# add_executable(gait_planner_node ${GAIT_PLANNER_SOURCES})
 # target_link_libraries(gait_planner_node ${catkin_LIBRARIES})
-# add_dependencies(gait_planner gait_planner_generate_messages_cpp
-# ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS}
-# )
-
-# target_link_libraries(gait_planner_node
-#   ${catkin_LIBRARIES}
-# )
+# add_dependencies(gait_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})

@@ -52,25 +52,24 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 #  add_message_files(
 #    FILES
-#    DetectionInfo.msg
-#    DetectionInfoArray.msg
 #  )
 
 ## Generate services in the 'srv' folder
 #  add_service_files(
 #    FILES
-#    move_hand_single.srv
-#    move_hand_both.srv
-#    gripOnline.srv
-#    home_service.srv
-#    SetTargetClass.srv
 #  )
 
 ## Generate added messages and services with any dependencies listed here
-#  generate_messages(
-#    DEPENDENCIES
-#    std_msgs
-#  )
+generate_messages(
+   DEPENDENCIES
+   std_msgs
+ )
+
+catkin_package(
+ INCLUDE_DIRS include
+ CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
+ DEPENDS Eigen3
+)
 
 ###########
 ## Build ##
@@ -84,10 +83,6 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )
 
-add_executable(robot_manager_node
-  src/RobotManager.cpp
-)
-
-target_link_libraries(robot_manager_node
-  ${catkin_LIBRARIES}
-)
+add_executable(robot_manager_node src/RobotManager.cpp)
+add_dependencies(robot_manager_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(robot_manager_node ${catkin_LIBRARIES})
