@@ -371,19 +371,6 @@ double S5_hand::move2pose(double max, double t_local, double T_start, double T_e
     return theta;
 }
 
-void S5_hand::SendGazebo(vector<double> q) {
-    ros::NodeHandle nh;
-    vector<ros::Publisher> pubs;
-    for (int i = 0; i < 29; ++i) {
-        pubs.push_back(nh.advertise<std_msgs::Float64>("surenaVgazebo/joint" + to_string(i) + "_position_controller/command", 100));
-    }
-    std_msgs::Float64 data;
-    for (int i = 0; i < 29; ++i) {
-        data.data = q[i];
-        pubs[i].publish(data);
-    }
-}
-
 double S5_hand::wrist_pos2mot(double pos) {
     return 60 * M_PI / 63 * tan(pos);
 }

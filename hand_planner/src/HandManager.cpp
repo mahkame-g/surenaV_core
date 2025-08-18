@@ -7,7 +7,7 @@ HandManager::HandManager(ros::NodeHandle *n) :
     // Initialize parameters
     T(0.005),
     rate(200),
-    simulation(false),
+    simulation(true),
     X(1.0), Y(0.0), Z(0.0),
     tempX(1.0), tempY(0.0), tempZ(0.0),
     h_pitch(0), h_roll(0), h_yaw(0),
@@ -44,6 +44,7 @@ HandManager::HandManager(ros::NodeHandle *n) :
     grip_online_service = n->advertiseService("grip_online_srv", &HandManager::grip_online, this);
     home_service = n->advertiseService("home_srv", &HandManager::home, this);
     set_target_class_service = n->advertiseService("set_target_class_srv", &HandManager::setTargetClassService, this);
+    gazeboHandJointStatePub_ = n->advertise<std_msgs::Float64MultiArray>("/hand_gazebo", 100);
 }
 
 // --- Object Detection Callback Implementations ---
@@ -273,7 +274,11 @@ bool HandManager::single_hand(hand_planner::move_hand_single::Request &req, hand
                 q_gazebo[18] = q_rad(2);  
                 q_gazebo[19] = q_rad(3);   
             }
-            hand_func_R.SendGazebo(q_gazebo);
+            hand_joint_angles_gazebo_.data.clear();
+            for (int i = 0; i < 29; i++) {
+                hand_joint_angles_gazebo_.data.push_back(q_gazebo[i]);
+            }
+            gazeboHandJointStatePub_.publish(hand_joint_angles_gazebo_);
         }
         ros::spinOnce();
         rate_.sleep();
@@ -344,7 +349,12 @@ bool HandManager::both_hands(hand_planner::move_hand_both::Request &req, hand_pl
             q_gazebo[17] = q_rad_l(1);   
             q_gazebo[18] = q_rad_l(2);  
             q_gazebo[19] = q_rad_l(3);
-            hand_func_R.SendGazebo(q_gazebo);
+            
+            hand_joint_angles_gazebo_.data.clear();
+            for (int i = 0; i < 29; i++) {
+                hand_joint_angles_gazebo_.data.push_back(q_gazebo[i]);
+            }
+            gazeboHandJointStatePub_.publish(hand_joint_angles_gazebo_);
         }
         ros::spinOnce();
         rate_.sleep();

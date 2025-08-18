@@ -17,6 +17,7 @@
 
 // ROS Message and Service Includes
 #include <std_msgs/Int32MultiArray.h>
+#include <std_msgs/Float64MultiArray.h>
 #include "hand_planner/DetectionInfoArray.h"
 #include "hand_planner/move_hand_single.h"
 #include "hand_planner/move_hand_both.h"
@@ -43,6 +44,8 @@ private:
     ros::ServiceServer grip_online_service;
     ros::ServiceServer home_service;
     ros::ServiceServer set_target_class_service;
+    ros::Publisher gazeboHandJointStatePub_;
+    std_msgs::Float64MultiArray hand_joint_angles_gazebo_;
 
     // --- CORE OBJECTS ---
     S5_hand hand_func_R;

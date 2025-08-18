@@ -86,7 +86,6 @@ public:
     double wrist_right_calc(double alpha, double beta);
 
     // Simulation and Hardware Interface
-    void SendGazebo(vector<double> q);
     double move2pose(double max, double t_local, double T_start, double T_end);
     vector<int> data2qc(vector<double> cntrl);
 

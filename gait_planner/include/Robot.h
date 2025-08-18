@@ -10,6 +10,7 @@
 #include "gait_planner/JntAngs.h"
 #include "gait_planner/Trajectory.h"
 #include "gait_planner/GeneralTraj.h"
+#include <std_msgs/Float64MultiArray.h>
 
 #include "json.hpp"
 #include "DCM.h"
@@ -131,6 +132,7 @@ private:
     ros::NodeHandle *nh_;
     std::string robotConfigPath_;
     bool simulation_;
+    std_msgs::Float64MultiArray foot_joint_angles_gazebo_;
 
     double thigh_;
     double shank_;
@@ -213,6 +215,7 @@ private:
     ros::Publisher comDataPub_;
     ros::Publisher xiDataPub_;
     ros::Publisher footStepPub_;
+    ros::Publisher gazeboFootJointStatePub_;
     bool isTrajAvailable_;
     bool useController_;
 

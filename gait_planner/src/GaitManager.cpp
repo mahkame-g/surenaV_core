@@ -947,6 +947,15 @@ void GaitManager::keyboardHandler(const std_msgs::Int32 &msg)
             isKeyboardTrajectoryEnabled = false;
             break;
 
+        case 117: // u: comming up
+            init_com_pos[2] = COM_height;
+            final_com_pos[2] = 0.71;
+            robot->generalTrajGen(dt, 2, init_com_pos, final_com_pos, init_com_orient, final_com_orient,
+                          init_lankle_pos, final_lankle_pos, init_lankle_orient, final_lankle_orient,
+                          init_rankle_pos, final_rankle_pos, init_rankle_orient, final_rankle_orient);
+            isKeyboardTrajectoryEnabled = false;
+            break;
+
         case 27: // esc: exit
             isKeyboardTrajectoryEnabled = false;
             isWalkingWithKeyboard = false;
