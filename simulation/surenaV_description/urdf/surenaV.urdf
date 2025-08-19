@@ -137,7 +137,7 @@
     <origin xyz="0.0296 -0.0291 0.0825" rpy="0 0 0" />
     <parent link="head_pitch" />
     <child link="head_roll" />
-    <axis xyz="-1 0 0" />
+    <axis xyz="1 0 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -559,7 +559,7 @@
     <origin xyz="0.050262 -0.18726 1.2635" rpy="0 0 0" />
     <parent link="base_link" />
     <child link="r_arm_pitch" />
-    <axis xyz="0 -1 0" />
+    <axis xyz="0 1 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -590,7 +590,7 @@
     <origin xyz="0.035 -0.05 0" rpy="0 0 0" />
     <parent link="r_arm_pitch" />
     <child link="r_arm_roll" />
-    <axis xyz="-1 0 0" />
+    <axis xyz="1 0 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -621,7 +621,7 @@
     <origin xyz="-0.033004 0 -0.13334" rpy="0 0 0" />
     <parent link="r_arm_roll" />
     <child link="r_elbow_pitch" />
-    <axis xyz="0 0 -1" />
+    <axis xyz="0 0 1" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -652,7 +652,7 @@
     <origin xyz="0 0.0335 -0.12309" rpy="0 0 0" />
     <parent link="r_elbow_pitch" />
     <child link="r_forearm_roll" />
-    <axis xyz="0 -1 0" />
+    <axis xyz="0 1 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -683,7 +683,7 @@
     <origin xyz="0 -0.03075 -0.07083" rpy="0 0 0" />
     <parent link="r_forearm_roll" />
     <child link="r_forearm_link" />
-    <axis xyz="0 0 -1" />
+    <axis xyz="0 0 1" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -714,7 +714,7 @@
     <origin xyz="0.01 0 -0.15132" rpy="0 0 0" />
     <parent link="r_forearm_link" />
     <child link="r_hand_pitch" />
-    <axis xyz="-1 0 0" />
+    <axis xyz="0 -1 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -745,7 +745,7 @@
     <origin xyz="-0.01 0.017 0" rpy="0 0 0" />
     <parent link="r_hand_pitch" />
     <child link="r_hand_roll" />
-    <axis xyz="0 -1 0" />
+    <axis xyz="1 0 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -806,7 +806,7 @@
     <origin xyz="0.050262 0.18852 1.2635" rpy="0 0 0" />
     <parent link="base_link" />
     <child link="l_arm_pitch" />
-    <axis xyz="0 -1 0" />
+    <axis xyz="0 1 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -899,14 +899,14 @@
     <origin xyz="0 -0.0325 -0.12309" rpy="0 0 0" />
     <parent link="l_elbow_pitch" />
     <child link="l_forearm_roll" />
-    <axis xyz="0 -1 0" />
+    <axis xyz="0 1 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
 
   <link name="l_forearm_link">
     <inertial>
-      <origin xyz="-0.00059087 0.01 -0.072286" rpy="0 0 0" />
+      <origin xyz="-0.00059087 0.01 -0.072286" rpy="0 0 1.57" />
       <mass value="0.18" />
       <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
     </inertial>
@@ -930,7 +930,7 @@
     <origin xyz="0 0.03075 -0.07083" rpy="0 0 0" />
     <parent link="l_forearm_roll" />
     <child link="l_forearm_link" />
-    <axis xyz="0 0 1" />
+    <axis xyz="0 0 -1" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>
@@ -992,7 +992,7 @@
     <origin xyz="-0.01 -0.017 0" rpy="0 0 0" />
     <parent link="l_hand_pitch" />
     <child link="l_hand_roll" />
-    <axis xyz="0 -1 0" />
+    <axis xyz="0 1 0" />
     <limit lower="-1.57" upper="1.57" effort="1000" velocity="0.5" />
     <dynamics damping="0.7" friction="0.3" />
   </joint>

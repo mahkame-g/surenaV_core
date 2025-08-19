@@ -44,7 +44,7 @@ HandManager::HandManager(ros::NodeHandle *n) :
     grip_online_service = n->advertiseService("grip_online_srv", &HandManager::grip_online, this);
     home_service = n->advertiseService("home_srv", &HandManager::home, this);
     set_target_class_service = n->advertiseService("set_target_class_srv", &HandManager::setTargetClassService, this);
-    gazeboHandJointStatePub_ = n->advertise<std_msgs::Float64MultiArray>("/hand_gazebo", 100);
+    gazeboJointStatePub_ = n->advertise<std_msgs::Float64MultiArray>("/joint_angles_gazebo", 100);
 }
 
 // --- Object Detection Callback Implementations ---
@@ -267,18 +267,24 @@ bool HandManager::single_hand(hand_planner::move_hand_single::Request &req, hand
                 q_gazebo[13] = q_rad(1);   
                 q_gazebo[14] = q_rad(2);  
                 q_gazebo[15] = q_rad(3);
+                q_gazebo[23] = q_rad(4);   
+                q_gazebo[24] = q_rad(5);  
+                q_gazebo[25] = q_rad(6);
             } else { // LEFT
                 VectorXd q_rad = qref_l.col(id);
                 q_gazebo[16] = q_rad(0);  
                 q_gazebo[17] = q_rad(1);   
                 q_gazebo[18] = q_rad(2);  
-                q_gazebo[19] = q_rad(3);   
+                q_gazebo[19] = q_rad(3);
+                q_gazebo[26] = q_rad(4);   
+                q_gazebo[27] = q_rad(5);  
+                q_gazebo[28] = q_rad(6);   
             }
-            hand_joint_angles_gazebo_.data.clear();
+            joint_angles_gazebo_.data.clear();
             for (int i = 0; i < 29; i++) {
-                hand_joint_angles_gazebo_.data.push_back(q_gazebo[i]);
+                joint_angles_gazebo_.data.push_back(q_gazebo[i]);
             }
-            gazeboHandJointStatePub_.publish(hand_joint_angles_gazebo_);
+            gazeboJointStatePub_.publish(joint_angles_gazebo_);
         }
         ros::spinOnce();
         rate_.sleep();
@@ -344,17 +350,23 @@ bool HandManager::both_hands(hand_planner::move_hand_both::Request &req, hand_pl
             q_gazebo[13] = q_rad_r(1);   
             q_gazebo[14] = q_rad_r(2);  
             q_gazebo[15] = q_rad_r(3);
+            q_gazebo[23] = q_rad_r(4);   
+            q_gazebo[24] = q_rad_r(5);  
+            q_gazebo[25] = q_rad_r(6);
             // Left hand joints
             q_gazebo[16] = q_rad_l(0);  
             q_gazebo[17] = q_rad_l(1);   
             q_gazebo[18] = q_rad_l(2);  
             q_gazebo[19] = q_rad_l(3);
+            q_gazebo[26] = q_rad_l(4);   
+            q_gazebo[27] = q_rad_l(5);  
+            q_gazebo[28] = q_rad_l(6); 
             
-            hand_joint_angles_gazebo_.data.clear();
+            joint_angles_gazebo_.data.clear();
             for (int i = 0; i < 29; i++) {
-                hand_joint_angles_gazebo_.data.push_back(q_gazebo[i]);
+                joint_angles_gazebo_.data.push_back(q_gazebo[i]);
             }
-            gazeboHandJointStatePub_.publish(hand_joint_angles_gazebo_);
+            gazeboJointStatePub_.publish(joint_angles_gazebo_);
         }
         ros::spinOnce();
         rate_.sleep();

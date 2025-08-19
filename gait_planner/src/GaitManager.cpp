@@ -111,8 +111,9 @@ bool GaitManager::sendCommand()
     motorCommand_.data.clear();
     for (int i = 0; i < 26; i++) {
         motorCommand_.data.push_back(motorCommandArray_[i]);
-        cout << motorCommandArray_[i] << ","; }
-    cout << endl;
+        // cout << motorCommandArray_[i] << ","; 
+    }
+    // cout << endl;
     motorDataPub_.publish(motorCommand_);
 }
 

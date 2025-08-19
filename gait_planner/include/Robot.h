@@ -132,7 +132,7 @@ private:
     ros::NodeHandle *nh_;
     std::string robotConfigPath_;
     bool simulation_;
-    std_msgs::Float64MultiArray foot_joint_angles_gazebo_;
+    std_msgs::Float64MultiArray joint_angles_gazebo_;
 
     double thigh_;
     double shank_;
@@ -215,7 +215,7 @@ private:
     ros::Publisher comDataPub_;
     ros::Publisher xiDataPub_;
     ros::Publisher footStepPub_;
-    ros::Publisher gazeboFootJointStatePub_;
+    ros::Publisher gazeboJointStatePub_;
     bool isTrajAvailable_;
     bool useController_;
 

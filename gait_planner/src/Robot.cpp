@@ -42,7 +42,7 @@ void Robot::initROSCommunication()
     zmpDataPub_ = nh_->advertise<geometry_msgs::PoseStamped>("/surena/zmp_position", 100);
     comDataPub_ = nh_->advertise<geometry_msgs::PoseStamped>("/surena/com_pose", 100);
     xiDataPub_ = nh_->advertise<geometry_msgs::Twist>("/xi_data", 100);
-    gazeboFootJointStatePub_ = nh_->advertise<std_msgs::Float64MultiArray>("/foot_gazebo", 100);
+    gazeboJointStatePub_ = nh_->advertise<std_msgs::Float64MultiArray>("/joint_angles_gazebo", 100);
 }
 
 void Robot::initializeRobotParams()
@@ -158,12 +158,17 @@ void Robot::spinOnline(double config[], double jnt_vel[], Vector3d torque_r, Vec
     Vector3d Rrpy = currentCommandedRightAnkleRot_.eulerAngles(2, 1, 0);
     Vector3d Lrpy = currentCommandedLeftAnkleRot_.eulerAngles(2, 1, 0);
 
-    foot_joint_angles_gazebo_.data.clear();
+    vector<double> q_gazebo(29, 0.0);
     for (int i = 0; i < 12; i++){
         joint_angles[i] = joints_[i]; // right leg(0-5) & left leg(6-11)
-        foot_joint_angles_gazebo_.data.push_back(joints_[i]);
+        q_gazebo[i] = joints_[i];
     }
-    gazeboFootJointStatePub_.publish(foot_joint_angles_gazebo_);
+
+    joint_angles_gazebo_.data.clear();
+    for (int i = 0; i < 29; i++) {
+        joint_angles_gazebo_.data.push_back(q_gazebo[i]);
+    }
+    gazeboJointStatePub_.publish(joint_angles_gazebo_);
 
     prevCommandedCoMPos_ = currentCommandedCoMPos_;
     prevCommandedCoMRot_ = currentCommandedCoMRot_;
