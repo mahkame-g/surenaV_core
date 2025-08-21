@@ -44,6 +44,7 @@ HandManager::HandManager(ros::NodeHandle *n) :
     grip_online_service = n->advertiseService("grip_online_srv", &HandManager::grip_online, this);
     home_service = n->advertiseService("home_srv", &HandManager::home, this);
     set_target_class_service = n->advertiseService("set_target_class_srv", &HandManager::setTargetClassService, this);
+    head_track_service = n->advertiseService("head_track_srv", &HandManager::head_track_handler, this);
     gazeboJointStatePub_ = n->advertise<std_msgs::Float64MultiArray>("/joint_angles_gazebo", 100);
 }
 
@@ -392,6 +393,7 @@ bool HandManager::home(hand_planner::home_service::Request &req, hand_planner::h
 bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_planner::gripOnline::Response &res) {
     ros::Rate rate_(rate);
     vector<double> q_motor(29, 0.0);
+    vector<double> q_gazebo(29, 0.0);
     VectorXd current_q_ra(7);
     current_q_ra << 10, -10, 0, -25, 0, 0, 0;
     current_q_ra *= M_PI / 180.0;
@@ -437,14 +439,81 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
             for(int i = 0; i < 29; i++) { 
                 trajectory_data.data.push_back(q_motor[i]); }
             trajectory_data_pub.publish(trajectory_data);
-        }
+        } else { // simulation
+            VectorXd q_delta = current_q_ra - initial_q_ra;
+            q_gazebo[12] = q_delta(0);  
+            q_gazebo[13] = q_delta(1);   
+            q_gazebo[14] = q_delta(2);  
+            q_gazebo[15] = q_delta(3);
+            q_gazebo[23] = q_delta(4);   
+            q_gazebo[24] = q_delta(5);  
+            q_gazebo[25] = q_delta(6);
 
+            q_gazebo[20] = h_roll;
+            q_gazebo[21] = h_pitch;
+            q_gazebo[22] = h_yaw;
+
+            joint_angles_gazebo_.data.clear();
+            for (int i = 0; i < 29; i++) {
+                joint_angles_gazebo_.data.push_back(q_gazebo[i]);
+            }
+            gazeboJointStatePub_.publish(joint_angles_gazebo_);
+        }
         ros::spinOnce();
         rate_.sleep();
         t_grip += T;
     }
 
     res.finish = "end";
+    return true;
+}
+
+bool HandManager::head_track_handler(hand_planner::head_track::Request &req, hand_planner::head_track::Response &res) {
+    ROS_INFO("Starting head tracking for %.2f seconds.", req.duration_seconds);
+    ros::Rate rate_(rate);
+    ros::Time start_time = ros::Time::now();
+    vector<double> q_motor(29, 0.0);
+    vector<double> q_gazebo(29, 0.0);
+
+    while (ros::ok() && (ros::Time::now() - start_time).toSec() < req.duration_seconds) {
+        Vector3d target2camera(X, Y, Z);
+
+        // Head Pitch Adjustment
+        if (abs(target2camera(2)) > 0.02) {
+            h_pitch += Kp * atan2(target2camera(2), sqrt(pow(target2camera(1), 2) + pow(target2camera(0), 2)));
+            h_pitch = max(-28.0 * M_PI / 180, min(28.0 * M_PI / 180, h_pitch));
+        }
+        // Head Yaw Adjustment
+        if (abs(target2camera(1)) > 0.02) {
+            h_yaw += Ky * atan2(target2camera(1), target2camera(0));
+            h_yaw = max(-90.0 * M_PI / 180, min(90.0 * M_PI / 180, h_yaw));
+        }
+
+        if (!simulation) {
+            q_motor[20] = int(roll_command_range[0] + (roll_command_range[1] - roll_command_range[0]) * ((-(h_roll*180/M_PI) - roll_range[0]) / (roll_range[1] - roll_range[0])));
+            q_motor[21] = int(pitch_command_range[0] + (pitch_command_range[1] - pitch_command_range[0]) * ((-(h_pitch*180/M_PI) - pitch_range[0]) / (pitch_range[1] - pitch_range[0])));
+            q_motor[22] = int(yaw_command_range[0] + (yaw_command_range[1] - yaw_command_range[0]) * ((-(h_yaw*180/M_PI) - yaw_range[0]) / (yaw_range[1] - yaw_range[0])));
+            
+            std_msgs::Int32MultiArray trajectory_data;
+            for(int i = 0; i < 29; i++) { 
+                trajectory_data.data.push_back(q_motor[i]); }
+            trajectory_data_pub.publish(trajectory_data);
+        } else { // simulation
+            q_gazebo[20] = h_roll;
+            q_gazebo[21] = h_pitch;
+            q_gazebo[22] = h_yaw;
+            cout << h_roll << "," << h_pitch << "," << h_yaw;
+            joint_angles_gazebo_.data.clear();
+            for (int i = 0; i < 29; i++) {
+                joint_angles_gazebo_.data.push_back(q_gazebo[i]);
+            }
+            gazeboJointStatePub_.publish(joint_angles_gazebo_);
+        }
+        ros::spinOnce();
+        rate_.sleep();
+    }
+    ROS_INFO("Head tracking finished.");
+    res.success = true;
     return true;
 }
 

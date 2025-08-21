@@ -65,6 +65,7 @@ add_service_files(
   gripOnline.srv
   home_service.srv
   SetTargetClass.srv
+  head_track.srv
 )
 
 ## Generate added messages and services with any dependencies listed here
@@ -104,6 +105,6 @@ target_link_libraries(hand_planner_lib ${catkin_LIBRARIES})
 # target_link_libraries(hand_planner_node ${catkin_LIBRARIES})
 # add_dependencies(hand_planner_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_executable(head_sub src/head_code.cpp)
-add_dependencies(head_sub ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(head_sub ${catkin_LIBRARIES})
+# add_executable(head_sub src/head_code.cpp)
+# add_dependencies(head_sub ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# target_link_libraries(head_sub ${catkin_LIBRARIES})

@@ -24,6 +24,7 @@
 #include "hand_planner/gripOnline.h"
 #include "hand_planner/home_service.h"
 #include "hand_planner/SetTargetClass.h"
+#include "hand_planner/head_track.h"
 
 using namespace std;
 using namespace Eigen;
@@ -44,6 +45,7 @@ private:
     ros::ServiceServer grip_online_service;
     ros::ServiceServer home_service;
     ros::ServiceServer set_target_class_service;
+    ros::ServiceServer head_track_service;
     ros::Publisher gazeboJointStatePub_;
     std_msgs::Float64MultiArray joint_angles_gazebo_;
 
@@ -98,6 +100,7 @@ private:
     bool home(hand_planner::home_service::Request &req, hand_planner::home_service::Response &res);
     bool grip_online(hand_planner::gripOnline::Request &req, hand_planner::gripOnline::Response &res);
     bool setTargetClassService(hand_planner::SetTargetClass::Request &req, hand_planner::SetTargetClass::Response &res);
+    bool head_track_handler(hand_planner::head_track::Request &req, hand_planner::head_track::Response &res); 
 };
 
 #endif // HAND_MANAGER_H
