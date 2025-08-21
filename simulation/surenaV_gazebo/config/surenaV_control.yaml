@@ -10,15 +10,15 @@ surenaV:
   head_yaw_joint_position_controller:
     type: effort_controllers/JointPositionController
     joint: head_yaw_joint
-    pid: {p: 1000.0, i: 0.01, d: 300}
+    pid: {p: 3000.0, i: 0.01, d: 30}
   head_pitch_joint_position_controller:
     type: effort_controllers/JointPositionController
     joint: head_pitch_joint
-    pid: {p: 1000.0, i: 0.01, d: 300}
+    pid: {p: 3000.0, i: 0.01, d: 30}
   head_roll_joint_position_controller:
     type: effort_controllers/JointPositionController
     joint: head_roll_joint
-    pid: {p: 1000.0, i: 0.01, d: 300}
+    pid: {p: 3000.0, i: 0.01, d: 30}
 
   # RIGHT LEG
   r_hip_yaw_joint_position_controller:
