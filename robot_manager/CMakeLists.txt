@@ -16,6 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
   hand_planner
 )
 
+find_package(yaml-cpp REQUIRED)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -55,9 +57,10 @@ find_package(catkin REQUIRED COMPONENTS
 #  )
 
 ## Generate services in the 'srv' folder
-#  add_service_files(
-#    FILES
-#  )
+ add_service_files(
+   FILES
+   ExecuteScenario.srv
+ )
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
@@ -81,8 +84,9 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
+  ${YAML_CPP_INCLUDE_DIRS}
 )
 
 add_executable(robot_manager_node src/RobotManager.cpp)
 add_dependencies(robot_manager_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(robot_manager_node ${catkin_LIBRARIES})
+target_link_libraries(robot_manager_node ${catkin_LIBRARIES} ${YAML_CPP_LIBRARIES})

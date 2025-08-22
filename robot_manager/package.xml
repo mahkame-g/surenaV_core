@@ -70,6 +70,7 @@
 
   <depend>hand_planner</depend>
   <depend>gait_planner</depend>
+  <depend>yaml-cpp</depend>
   
   <!-- The export tag contains other, unspecified, tags -->
   <export>

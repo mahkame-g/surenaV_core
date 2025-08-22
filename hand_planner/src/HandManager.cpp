@@ -415,7 +415,7 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
         // Head Yaw
         if (abs(target2camera(1)) > 0.02) {
             h_yaw += Ky * atan2(target2camera(1), target2camera(0));
-            h_yaw = max(-90.0*M_PI/180, min(90.0*M_PI/180, h_yaw));
+            h_yaw = max(-60.0*M_PI/180, min(60.0*M_PI/180, h_yaw));
         }
 
         R_target_r = hand_func_R.rot(2, -65 * M_PI / 180, 3);
@@ -449,9 +449,9 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
             q_gazebo[24] = q_delta(5);  
             q_gazebo[25] = q_delta(6);
 
-            q_gazebo[20] = h_roll;
-            q_gazebo[21] = h_pitch;
-            q_gazebo[22] = h_yaw;
+            q_gazebo[20] = -h_roll;
+            q_gazebo[21] = -h_pitch;
+            q_gazebo[22] = -h_yaw;
 
             joint_angles_gazebo_.data.clear();
             for (int i = 0; i < 29; i++) {
@@ -486,7 +486,7 @@ bool HandManager::head_track_handler(hand_planner::head_track::Request &req, han
         // Head Yaw Adjustment
         if (abs(target2camera(1)) > 0.02) {
             h_yaw += Ky * atan2(target2camera(1), target2camera(0));
-            h_yaw = max(-90.0 * M_PI / 180, min(90.0 * M_PI / 180, h_yaw));
+            h_yaw = max(-60.0 * M_PI / 180, min(60.0 * M_PI / 180, h_yaw));
         }
 
         if (!simulation) {
@@ -499,10 +499,10 @@ bool HandManager::head_track_handler(hand_planner::head_track::Request &req, han
                 trajectory_data.data.push_back(q_motor[i]); }
             trajectory_data_pub.publish(trajectory_data);
         } else { // simulation
-            q_gazebo[20] = h_roll;
-            q_gazebo[21] = h_pitch;
-            q_gazebo[22] = h_yaw;
-            cout << h_roll << "," << h_pitch << "," << h_yaw;
+            q_gazebo[20] = -h_roll;
+            q_gazebo[21] = -h_pitch;
+            q_gazebo[22] = -h_yaw;
+            
             joint_angles_gazebo_.data.clear();
             for (int i = 0; i < 29; i++) {
                 joint_angles_gazebo_.data.push_back(q_gazebo[i]);
