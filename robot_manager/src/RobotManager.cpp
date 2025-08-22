@@ -160,6 +160,12 @@ int main(int argc, char **argv) {
     ros::NodeHandle n;
     RobotManager robot_manager(&n);
     ROS_INFO("Robot Manager is running and ready to execute commands and scenarios.");
-    ros::spin();
+    // Create an AsyncSpinner.
+    // The '2' means it will create a pool of 2 threads to process callbacks and prevent deadlocks (one for the scenario client, one for the service provider). You can increase this if needed.
+    ros::AsyncSpinner spinner(2);
+    // Start the spinner. It will now process callbacks in the background.
+    spinner.start();
+    // Wait for ROS to shut down. replacement of the old ros::spin().
+    ros::waitForShutdown();;
     return 0;
 }

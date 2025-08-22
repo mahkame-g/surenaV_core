@@ -4,6 +4,7 @@
 #include "ros/ros.h"
 #include <memory>
 #include <yaml-cpp/yaml.h>
+#include "ros/callback_queue.h"
 
 // Include managers from library packages
 #include "HandManager.h"
