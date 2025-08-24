@@ -16,6 +16,7 @@
 #include "json.hpp"
 
 // ROS Message and Service Includes
+#include <std_srvs/Empty.h>
 #include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Float64MultiArray.h>
 #include "hand_planner/DetectionInfoArray.h"
@@ -38,16 +39,17 @@ public:
 private:
     // --- ROS COMMUNICATION HANDLES ---
     ros::Publisher trajectory_data_pub;
+    ros::Publisher gazeboJointStatePub_;
     ros::Subscriber camera_data_sub;
     ros::Subscriber joint_qc_sub;
+    ros::Subscriber teleoperation_data_sub;
     ros::ServiceServer move_hand_single_service;
     ros::ServiceServer move_hand_both_service;
     ros::ServiceServer grip_online_service;
     ros::ServiceServer home_service;
     ros::ServiceServer set_target_class_service;
     ros::ServiceServer head_track_service;
-    ros::Publisher gazeboJointStatePub_;
-    std_msgs::Float64MultiArray joint_angles_gazebo_;
+    ros::ServiceServer teleoperation_service;
 
     // --- CORE OBJECTS ---
     S5_hand hand_func_R;
@@ -66,6 +68,8 @@ private:
     double sum_r;
     double sum_l;
     int QcArr[29];
+    std_msgs::Float64MultiArray joint_angles_gazebo_;
+    VectorXd q_rad_teleop;
 
     // --- PARAMETERS ---
     double T;
@@ -89,6 +93,7 @@ private:
     // --- ROS CALLBACKS (Declarations) ---
     void object_detect_callback(const hand_planner::DetectionInfoArray &msg);
     void joint_qc_callback(const std_msgs::Int32MultiArray::ConstPtr &qcArray);
+    void teleoperation_callback(const std_msgs::Float64MultiArray &q_deg_teleop);
 
     // --- REFACTORED CORE LOGIC (Declarations) ---
     MatrixXd scenario_target(HandType type, string scenario, int i, VectorXd ee_pos, string ee_ini_pos);
@@ -100,7 +105,8 @@ private:
     bool home(hand_planner::home_service::Request &req, hand_planner::home_service::Response &res);
     bool grip_online(hand_planner::gripOnline::Request &req, hand_planner::gripOnline::Response &res);
     bool setTargetClassService(hand_planner::SetTargetClass::Request &req, hand_planner::SetTargetClass::Response &res);
-    bool head_track_handler(hand_planner::head_track::Request &req, hand_planner::head_track::Response &res); 
+    bool head_track_handler(hand_planner::head_track::Request &req, hand_planner::head_track::Response &res);
+    bool teleoperation_handler(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
 };
 
 #endif // HAND_MANAGER_H

@@ -35,17 +35,22 @@ HandManager::HandManager(ros::NodeHandle *n) :
     wrist_right_range = {90, -90};
     wrist_left_range = {90, -90};
 
+    q_rad_teleop.resize(14);
+    q_rad_teleop.setZero();
+
     // ROS Communication Setup
     trajectory_data_pub = n->advertise<std_msgs::Int32MultiArray>("jointdata/qc", 100);
+    gazeboJointStatePub_ = n->advertise<std_msgs::Float64MultiArray>("/joint_angles_gazebo", 100);
     camera_data_sub = n->subscribe("/detection_info", 1, &HandManager::object_detect_callback, this);
     joint_qc_sub = n->subscribe("jointdata/qc", 100, &HandManager::joint_qc_callback, this);
+    teleoperation_data_sub = n->subscribe("teleoperation/angles", 100, &HandManager::teleoperation_callback, this);
     move_hand_single_service = n->advertiseService("move_hand_single_srv", &HandManager::single_hand, this);
     move_hand_both_service = n->advertiseService("move_hand_both_srv", &HandManager::both_hands, this);
     grip_online_service = n->advertiseService("grip_online_srv", &HandManager::grip_online, this);
     home_service = n->advertiseService("home_srv", &HandManager::home, this);
     set_target_class_service = n->advertiseService("set_target_class_srv", &HandManager::setTargetClassService, this);
     head_track_service = n->advertiseService("head_track_srv", &HandManager::head_track_handler, this);
-    gazeboJointStatePub_ = n->advertise<std_msgs::Float64MultiArray>("/joint_angles_gazebo", 100);
+    teleoperation_service = n->advertiseService("teleoperation_srv", &HandManager::teleoperation_handler, this);
 }
 
 // --- Object Detection Callback Implementations ---
@@ -91,6 +96,13 @@ void HandManager::object_detect_callback(const hand_planner::DetectionInfoArray 
 void HandManager::joint_qc_callback(const std_msgs::Int32MultiArray::ConstPtr &qcArray) {
     for (size_t i = 0; i < qcArray->data.size() && i < 29; ++i) {
         QcArr[i] = qcArray->data[i];
+    }
+}
+
+void HandManager::teleoperation_callback(const std_msgs::Float64MultiArray &q_deg_teleop) {
+    assert(q_deg_teleop.data.size() == 14);
+    for (size_t i = 0; i < q_deg_teleop.data.size(); ++i) {
+        q_rad_teleop(i) = q_deg_teleop.data[i] * M_PI / 180.0;  // deg → rad
     }
 }
 
@@ -517,6 +529,65 @@ bool HandManager::head_track_handler(hand_planner::head_track::Request &req, han
     }
     ROS_INFO("Head tracking finished.");
     res.success = true;
+    return true;
+}
+
+bool HandManager::teleoperation_handler(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
+    ros::Rate rate_(rate);
+    ros::Time start_time = ros::Time::now();
+    vector<double> q_motor(29, 0.0);
+    vector<double> q_gazebo(29, 0.0);
+    while (ros::ok() && (ros::Time::now() - start_time).toSec() < 120) {
+        if (!simulation) {
+            // RIGHT
+            q_motor[12]=int(q_rad_teleop(0)*encoderResolution[0]*harmonicRatio[0]/M_PI/2);
+            q_motor[13]=-int(q_rad_teleop(1)*encoderResolution[0]*harmonicRatio[1]/M_PI/2);
+            q_motor[14]=int(q_rad_teleop(2)*encoderResolution[1]*harmonicRatio[2]/M_PI/2);
+            q_motor[15]=-int(q_rad_teleop(3)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
+            // q_motor[21] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_R.wrist_left_calc(q_rad_teleop(5), q_rad_teleop(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
+            // q_motor[20] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_R.wrist_right_calc(q_rad_teleop(5), q_rad_teleop(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
+            // q_motor[22] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((q_rad_teleop(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+            // LEFT
+            q_motor[16]=-int(q_rad_teleop(7)*encoderResolution[0]*harmonicRatio[0]/M_PI/2);
+            q_motor[17]=-int(q_rad_teleop(8)*encoderResolution[0]*harmonicRatio[1]/M_PI/2);
+            q_motor[18]=int(q_rad_teleop(9)*encoderResolution[1]*harmonicRatio[2]/M_PI/2);
+            q_motor[19]=-int(q_rad_teleop(10)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
+            // q_motor[21] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_left_calc(q_rad_teleop(12), q_rad_teleop(13))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
+            // q_motor[20] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_right_calc(q_rad_teleop(12), q_rad_teleop(13))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
+            // q_motor[22] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((q_rad_teleop(11) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+        
+            std_msgs::Int32MultiArray trajectory_data;
+            for(int i = 0; i < 29; i++) { 
+                trajectory_data.data.push_back(q_motor[i]); }
+            trajectory_data_pub.publish(trajectory_data);
+        } else { // simulation
+            // RIGHT
+            q_gazebo[12] = q_rad_teleop(0);
+            q_gazebo[13] = q_rad_teleop(1);
+            q_gazebo[14] = q_rad_teleop(2);
+            q_gazebo[15] = q_rad_teleop(3);
+            q_gazebo[23] = q_rad_teleop(4);
+            q_gazebo[24] = q_rad_teleop(5);
+            q_gazebo[25] = q_rad_teleop(6);
+            // LEFT
+            q_gazebo[16] = q_rad_teleop(7);
+            q_gazebo[17] = q_rad_teleop(8);
+            q_gazebo[18] = q_rad_teleop(9);
+            q_gazebo[19] = q_rad_teleop(10);
+            q_gazebo[26] = q_rad_teleop(11);
+            q_gazebo[27] = q_rad_teleop(12);
+            q_gazebo[28] = q_rad_teleop(13);
+
+            joint_angles_gazebo_.data.clear();
+            for (int i = 0; i < 29; i++) {
+                joint_angles_gazebo_.data.push_back(q_gazebo[i]);
+            }
+            gazeboJointStatePub_.publish(joint_angles_gazebo_);
+        }
+        ros::spinOnce();
+        rate_.sleep();
+    }
+    ROS_INFO("Teleoperation time finished.");
     return true;
 }
 

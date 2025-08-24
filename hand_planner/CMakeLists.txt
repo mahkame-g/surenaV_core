@@ -8,12 +8,10 @@ project(hand_planner)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  controller_manager
-  joint_state_controller
-  robot_state_publisher
   roscpp
   rospy
   std_msgs
+  std_srvs
   message_generation
 )
 
@@ -72,13 +70,13 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  std_srvs
 )
-
 
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES hand_planner_lib
-  CATKIN_DEPENDS roscpp std_msgs message_runtime
+  CATKIN_DEPENDS roscpp std_msgs message_runtime std_srvs
   DEPENDS Eigen3
 )
 
