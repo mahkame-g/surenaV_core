@@ -240,7 +240,7 @@ bool HandManager::single_hand(hand_planner::move_hand_single::Request &req, hand
                 q_motor[12]=int(q_rad(0)*encoderResolution[0]*harmonicRatio[0]/M_PI/2);
                 q_motor[13]=-int(q_rad(1)*encoderResolution[0]*harmonicRatio[1]/M_PI/2);
                 q_motor[14]=int(q_rad(2)*encoderResolution[1]*harmonicRatio[2]/M_PI/2);
-                q_motor[15]=int(q_rad(3)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
+                q_motor[15]=-int(q_rad(3)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
                 // Note: Right Wrist calculations should be added here
                 // q_motor[21] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_R.wrist_left_calc(q_rad(5), q_rad(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
                 // q_motor[20] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_R.wrist_right_calc(q_rad(5), q_rad(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
@@ -330,7 +330,7 @@ bool HandManager::both_hands(hand_planner::move_hand_both::Request &req, hand_pl
             q_motor[12] = int(q_rad_r(0) * encoderResolution[0] * harmonicRatio[0] / (2 * M_PI));
             q_motor[13] = -int(q_rad_r(1) * encoderResolution[0] * harmonicRatio[1] / (2 * M_PI));
             q_motor[14] = int(q_rad_r(2) * encoderResolution[1] * harmonicRatio[2] / (2 * M_PI));
-            q_motor[15] = int(q_rad_r(3) * encoderResolution[1] * harmonicRatio[3] / (2 * M_PI));
+            q_motor[15] = -int(q_rad_r(3) * encoderResolution[1] * harmonicRatio[3] / (2 * M_PI));
             // Left hand motors
             q_motor[16] = -int(q_rad_l(0) * encoderResolution[0] * harmonicRatio[0] / (2 * M_PI));
             q_motor[17] = -int(q_rad_l(1) * encoderResolution[0] * harmonicRatio[1] / (2 * M_PI));
@@ -418,19 +418,22 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
             h_yaw = max(-60.0*M_PI/180, min(60.0*M_PI/180, h_yaw));
         }
 
+        if (t_grip >= 15 && Y != 0 && Z != 0) {
         R_target_r = hand_func_R.rot(2, -65 * M_PI / 180, 3);
+        hand_func_R.update_hand(current_q_ra, Vector3d::Zero(), target2shoulder, R_target_r);
         Vector3d V_r = 0.7 * (target2shoulder - hand_func_R.r_palm);
         
         hand_func_R.update_hand(current_q_ra, V_r, target2shoulder, R_target_r);
-        hand_func_R.doQP(current_q_ra);
+        hand_func_R.doQP(current_q_ra);  // Solve the inverse kinematics
         current_q_ra = hand_func_R.q_next;
+        }
 
         if (!simulation) {
             VectorXd q_delta = current_q_ra - initial_q_ra;
             q_motor[12]=int(q_delta(0)*encoderResolution[0]*harmonicRatio[0]/M_PI/2);
             q_motor[13]=-int(q_delta(1)*encoderResolution[0]*harmonicRatio[1]/M_PI/2);
             q_motor[14]=int(q_delta(2)*encoderResolution[1]*harmonicRatio[2]/M_PI/2);
-            q_motor[15]=int(q_delta(3)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
+            q_motor[15]=-int(q_delta(3)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
             q_motor[20] = int(roll_command_range[0] + (roll_command_range[1] - roll_command_range[0]) * ((-(h_roll*180/M_PI) - roll_range[0]) / (roll_range[1] - roll_range[0])));
             q_motor[21] = int(pitch_command_range[0] + (pitch_command_range[1] - pitch_command_range[0]) * ((-(h_pitch*180/M_PI) - pitch_range[0]) / (pitch_range[1] - pitch_range[0])));
             q_motor[22] = int(yaw_command_range[0] + (yaw_command_range[1] - yaw_command_range[0]) * ((-(h_yaw*180/M_PI) - yaw_range[0]) / (yaw_range[1] - yaw_range[0])));

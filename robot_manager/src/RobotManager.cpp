@@ -78,6 +78,9 @@ bool RobotManager::execute_step(const YAML::Node& step) {
         return srv.response.success;
 
     } else if (service_name == "/move_hand_single_srv") {
+        if (!params["mode"] || !params["ee_ini_pos"] || !params["scen_count"] || !params["t_total"] || !params["scenario"]) {
+            ROS_ERROR("One or more required parameters are missing for %s", service_name.c_str()); return false;
+        }
         ros::ServiceClient client = nh_->serviceClient<hand_planner::move_hand_single>(service_name);
         hand_planner::move_hand_single srv;
         srv.request.mode = params["mode"].as<std::string>();
@@ -89,6 +92,9 @@ bool RobotManager::execute_step(const YAML::Node& step) {
         return true;
 
     } else if (service_name == "/move_hand_both_srv") {
+        if (!params["scenarioR"] || !params["ee_ini_posR"] || !params["scenR_count"] || !params["scenarioL"] || !params["ee_ini_posL"] || !params["scenL_count"] || !params["t_total"]) {
+            ROS_ERROR("One or more required parameters are missing for %s", service_name.c_str()); return false;
+        }
         ros::ServiceClient client = nh_->serviceClient<hand_planner::move_hand_both>(service_name);
         hand_planner::move_hand_both srv;
         srv.request.ee_ini_posR = params["ee_ini_posR"].as<std::string>();
@@ -102,6 +108,10 @@ bool RobotManager::execute_step(const YAML::Node& step) {
         return true;
 
     } else if (service_name == "/walk_service") {
+        if (!params["alpha"] || !params["t_double_support"] || !params["t_step"] || !params["step_length"] || !params["step_width"] || !params["COM_height"] || !params["step_count"] ||
+            !params["ankle_height"] || !params["dt"] || !params["theta"] || !params["step_height"] || !params["com_offset"] || !params["is_config"]) {
+            ROS_ERROR("One or more required parameters are missing for %s", service_name.c_str()); return false;
+        }
         ros::ServiceClient client = nh_->serviceClient<gait_planner::Trajectory>(service_name);
         gait_planner::Trajectory srv;
         srv.request.alpha = params["alpha"].as<double>();
@@ -163,9 +173,7 @@ int main(int argc, char **argv) {
     // Create an AsyncSpinner.
     // The '2' means it will create a pool of 2 threads to process callbacks and prevent deadlocks (one for the scenario client, one for the service provider). You can increase this if needed.
     ros::AsyncSpinner spinner(2);
-    // Start the spinner. It will now process callbacks in the background.
     spinner.start();
-    // Wait for ROS to shut down. replacement of the old ros::spin().
-    ros::waitForShutdown();;
+    ros::waitForShutdown(); // replacement of the old ros::spin().
     return 0;
 }
