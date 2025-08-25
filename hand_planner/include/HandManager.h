@@ -14,6 +14,7 @@
 #include <ros/ros.h>
 #include <ros/package.h>
 #include "json.hpp"
+#include <deque>
 
 // ROS Message and Service Includes
 #include <std_srvs/Empty.h>
@@ -43,6 +44,7 @@ private:
     ros::Subscriber camera_data_sub;
     ros::Subscriber joint_qc_sub;
     ros::Subscriber teleoperation_data_sub;
+    ros::Subscriber micArray_data_sub;
     ros::ServiceServer move_hand_single_service;
     ros::ServiceServer move_hand_both_service;
     ros::ServiceServer grip_online_service;
@@ -89,11 +91,14 @@ private:
     double t_grip;
     int target_class_id_ = 41; // Default: "cup"
     std::mutex target_mutex_;
+    double micArray_theta;
+    std::deque<double> micArray_data_buffer;
 
     // --- ROS CALLBACKS (Declarations) ---
     void object_detect_callback(const hand_planner::DetectionInfoArray &msg);
     void joint_qc_callback(const std_msgs::Int32MultiArray::ConstPtr &qcArray);
     void teleoperation_callback(const std_msgs::Float64MultiArray &q_deg_teleop);
+    void micArray_callback(const std_msgs::Float64 &msg);
 
     // --- REFACTORED CORE LOGIC (Declarations) ---
     MatrixXd scenario_target(HandType type, string scenario, int i, VectorXd ee_pos, string ee_ini_pos);

@@ -44,6 +44,7 @@ HandManager::HandManager(ros::NodeHandle *n) :
     camera_data_sub = n->subscribe("/detection_info", 1, &HandManager::object_detect_callback, this);
     joint_qc_sub = n->subscribe("jointdata/qc", 100, &HandManager::joint_qc_callback, this);
     teleoperation_data_sub = n->subscribe("teleoperation/angles", 100, &HandManager::teleoperation_callback, this);
+    micArray_data_sub = n->subscribe("micarray/angle", 100, &HandManager::micArray_callback, this);
     move_hand_single_service = n->advertiseService("move_hand_single_srv", &HandManager::single_hand, this);
     move_hand_both_service = n->advertiseService("move_hand_both_srv", &HandManager::both_hands, this);
     grip_online_service = n->advertiseService("grip_online_srv", &HandManager::grip_online, this);
@@ -65,6 +66,7 @@ bool HandManager::setTargetClassService(hand_planner::SetTargetClass::Request &r
         } else {
             target_class_id_ = object_classes[req.class_name];    
             res.class_id = target_class_id_;
+            X = 1.0; Y = 0; Z = 0; 
         }
         return true;
 }
@@ -103,6 +105,22 @@ void HandManager::teleoperation_callback(const std_msgs::Float64MultiArray &q_de
     assert(q_deg_teleop.data.size() == 14);
     for (size_t i = 0; i < q_deg_teleop.data.size(); ++i) {
         q_rad_teleop(i) = q_deg_teleop.data[i] * M_PI / 180.0;  // deg → rad
+    }
+}
+
+void HandManager::micArray_callback(const std_msgs::Float64 &msg) {
+    int MAX_CAPACITY = 10;
+    micArray_data_buffer.push_back(msg.data);
+    if (micArray_data_buffer.size() > MAX_CAPACITY) {
+        micArray_data_buffer.pop_front();
+    }
+    // Only check if we have at least 5 values
+    if (micArray_data_buffer.size() >= 3) {
+        auto start = micArray_data_buffer.end() - 3;    // Take last 3 elements
+        bool all_equal = std::all_of(start + 1, micArray_data_buffer.end(), [first = *start](double v){ return fabs(v - first) < 1e-6; });
+        if (all_equal) {
+            micArray_theta = (msg.data - 90) * M_PI / 180;
+        }
     }
 }
 
@@ -264,9 +282,9 @@ bool HandManager::single_hand(hand_planner::move_hand_single::Request &req, hand
                 q_motor[18]=int(q_rad(2)*encoderResolution[1]*harmonicRatio[2]/M_PI/2);
                 q_motor[19]=-int(q_rad(3)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
                 // Note: Left Wrist calculations should be added here
-                // q_motor[21] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_left_calc(q_rad(5), q_rad(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
-                // q_motor[20] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_right_calc(q_rad(5), q_rad(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
-                // q_motor[22] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((q_rad(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+                q_motor[21] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((q_rad(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+                q_motor[22] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_right_calc(q_rad(5), q_rad(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
+                q_motor[20] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_left_calc(q_rad(5), q_rad(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
             }
             std_msgs::Int32MultiArray trajectory_data;
             for(int i = 0; i < 29; i++) { 
@@ -492,15 +510,20 @@ bool HandManager::head_track_handler(hand_planner::head_track::Request &req, han
 
     while (ros::ok() && (ros::Time::now() - start_time).toSec() < req.duration_seconds) {
         Vector3d target2camera(X, Y, Z);
-
-        // Head Pitch Adjustment
-        if (abs(target2camera(2)) > 0.02) {
-            h_pitch += Kp * atan2(target2camera(2), sqrt(pow(target2camera(1), 2) + pow(target2camera(0), 2)));
-            h_pitch = max(-28.0 * M_PI / 180, min(28.0 * M_PI / 180, h_pitch));
-        }
-        // Head Yaw Adjustment
-        if (abs(target2camera(1)) > 0.02) {
-            h_yaw += Ky * atan2(target2camera(1), target2camera(0));
+        
+        if (Y != 0 && Z != 0){ // target not in robot's sight; so the head cannot track object yet.
+            // Head Pitch
+            if (abs(target2camera(2)) > 0.02) {
+                h_pitch += Kp * atan2(target2camera(2), sqrt(pow(target2camera(1), 2) + pow(target2camera(0), 2)));
+                h_pitch = max(-28.0 * M_PI / 180, min(28.0 * M_PI / 180, h_pitch));
+            }
+            // Head Yaw
+            if (abs(target2camera(1)) > 0.02) {
+                h_yaw += Ky * atan2(target2camera(1), target2camera(0));
+                h_yaw = max(-60.0 * M_PI / 180, min(60.0 * M_PI / 180, h_yaw));
+            }
+        } else { // follow direction of arrival (voice) instead.
+            h_yaw += Ky * micArray_theta;
             h_yaw = max(-60.0 * M_PI / 180, min(60.0 * M_PI / 180, h_yaw));
         }
 

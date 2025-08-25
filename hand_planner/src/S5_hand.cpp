@@ -6,12 +6,12 @@ S5_hand::S5_hand(HandType type) : hand_type(type) {
     if (hand_type == RIGHT) {
         angle_fix_shd = toRad(10);
         minimum = {-110.0, -90.0, -60.0, -90.0, -90.0, -20.0, -20.0};
-        maximum = {80.0, -5.0, 60.0, -1.0, 90.0, 20.0, 20.0};
+        maximum = {80.0, -5.0, 60.0, -5.0, 90.0, 20.0, 20.0};
         wrist_clip_value = 85.0;
     } else { // LEFT
         angle_fix_shd = toRad(-10);
         minimum = {-110.0, 5.0, -60.0, -90.0, -90.0, -20.0, -20.0};
-        maximum = {80.0, 90.0, 60.0, -1.0, 90.0, 20.0, 20.0};
+        maximum = {80.0, 90.0, 60.0, -5.0, 90.0, 20.0, 20.0};
         wrist_clip_value = 64.0;
     }
 }
