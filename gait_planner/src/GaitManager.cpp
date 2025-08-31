@@ -30,6 +30,14 @@ GaitManager::GaitManager(ros::NodeHandle *n)
     r30_inner << 0.035, 0.034, -0.002;
     r30_outer << 0.035, -0.034, -0.002;
 
+    // Motor and sensor constants of Hands
+    encoderResolution[0] = 4096 * 4;
+    encoderResolution[1] = 2048 * 4;
+    harmonicRatio[0] = 100;
+    harmonicRatio[1] = 100;
+    harmonicRatio[2] = 100;
+    harmonicRatio[3] = 400;
+
     qcInitialBool_ = false;
     isKeyboardTrajectoryEnabled = false;
     isWalkingWithKeyboard = false;
@@ -465,6 +473,8 @@ bool GaitManager::sendCommand(gait_planner::command::Request &req,
         sendCommand();
         ros::spinOnce();
         rate_.sleep();
+        res.result = true; 
+        return true;    
     }
     else
     {
@@ -475,6 +485,8 @@ bool GaitManager::sendCommand(gait_planner::command::Request &req,
             sendCommand();
             ros::spinOnce();
             rate_.sleep();
+            res.result = true; 
+            return true;    
         }
     }
 }
@@ -644,6 +656,11 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
     // int final_iter = robot->OnlineDCMTrajGen(req.step_count, req.t_step, req.alpha, req.t_double_support, req.COM_height, req.step_length,
     //                                          req.step_width, dt, req.theta, req.ankle_height, req.step_height, 0, req.com_offset, req.is_config);
 
+    if (req.hand_swing_angle > 0)
+    {
+        robot->handMotion(req.t_step, req.step_count, req.hand_swing_angle, dt, false);
+    }
+
     int iter = 0;
     int final_iter = robot->getTrajSize();
     // int final_iter = req.t_step + 4;
@@ -657,9 +674,23 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
 
     while (iter < final_iter)
     {
-        // motorCommandArray_[13] = -int(right_arm_traj[iter] * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
-        // motorCommandArray_[16] = int(left_arm_traj[iter] * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
-        // cout << motorCommandArray_[13] << ", " << motorCommandArray_[16] << endl;
+
+        if (req.hand_swing_angle > 0)
+        {
+            double right_armswing_rad, left_armswing_rad;
+            // Get the angles for this time step from the Robot class
+            robot->getArmAnglesForIteration(iter, right_armswing_rad, left_armswing_rad);
+
+            // Set the motor commands for the physical robot's arms
+            motorCommandArray_[12] = -int(right_armswing_rad * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
+            motorCommandArray_[16] =  int(left_armswing_rad  * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
+            cout << right_armswing_rad << ", " << left_armswing_rad << endl;
+            
+            // For debugging:
+            // cout << motorCommandArray_[12] << ", " << motorCommandArray_[16] << endl;
+        }
+
+
         double config[12];
         double jnt_vel[12];
         double left_ft[3] = {-currentLFT_[0], -currentLFT_[2], -currentLFT_[1]};

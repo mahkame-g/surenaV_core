@@ -122,6 +122,9 @@ void Robot::spinOnline(double config[], double jnt_vel[], Vector3d torque_r, Vec
 {
     updateRobotState(config, jnt_vel, torque_r, torque_l, f_r, f_l, gyro, accelerometer);
 
+
+    
+
     double f_r_filtered = butterworthfilter_-> FilterData(100, 200, f_r);
 
     if (!bumpSensorCalibrated_ && currentRobotPhase_ == 0)
@@ -160,8 +163,22 @@ void Robot::spinOnline(double config[], double jnt_vel[], Vector3d torque_r, Vec
 
     vector<double> q_gazebo(29, 0.0);
     for (int i = 0; i < 12; i++){
-        joint_angles[i] = joints_[i]; // right leg(0-5) & left leg(6-11)
+        joint_angles[i] = joints_[i]; // This returns the leg angles to GaitManager
         q_gazebo[i] = joints_[i];
+    }
+
+    if (!rightArmswingTraj_.empty() && index_ < rightArmswingTraj_.size()) {
+        q_gazebo[12] = rightArmswingTraj_[index_]; // Place right arm angle in the Gazebo message
+        // q_gazebo[13] = 0.0; 
+        // q_gazebo[14] = 0.0; 
+        // q_gazebo[15] = 0.0; 
+
+    }
+    if (!leftArmswingTraj_.empty() && index_ < leftArmswingTraj_.size()) {
+        q_gazebo[16] = leftArmswingTraj_[index_]; // Place left arm angle in the Gazebo message
+        // q_gazebo[17] = 0.0; 
+        // q_gazebo[18] = 0.0; 
+        // q_gazebo[19] = 0.0;
     }
 
     joint_angles_gazebo_.data.clear();
@@ -176,6 +193,7 @@ void Robot::spinOnline(double config[], double jnt_vel[], Vector3d torque_r, Vec
     prevCommandedLeftAnkleRot_ = currentCommandedLeftAnkleRot_;
     prevCommandedRightAnklePos_ = currentCommandedRightAnklePos_;
     prevCommandedRightAnkleRot_ = currentCommandedRightAnkleRot_;
+
 }
 
 void Robot::runFootLenController(double f_l, double f_r, ControlState robot_cs)
@@ -1049,13 +1067,13 @@ bool Robot::getJointAngs(int iter, double config[12], double jnt_vel[12], double
         }
         status = 0; // 0: Okay, 1: Ankle Collision
 
-        currentCommandedCoMPos_ = CoMPos_[iter];
-        currentCommandedCoMRot_ = CoMRot_[iter];
-        currentCommandedLeftAnklePos_ = lAnklePos_[iter];
-        currentCommandedLeftAnkleRot_ = lAnkleRot_[iter];
-        currentCommandedRightAnklePos_ = rAnklePos_[iter];
-        currentCommandedRightAnkleRot_ = rAnkleRot_[iter];
-        currentRobotPhase_ = robotPhase_[iter];
+            currentCommandedCoMPos_ = CoMPos_[iter];
+            currentCommandedCoMRot_ = CoMRot_[iter];
+            currentCommandedLeftAnklePos_ = lAnklePos_[iter];
+            currentCommandedLeftAnkleRot_ = lAnkleRot_[iter];
+            currentCommandedRightAnklePos_ = rAnklePos_[iter];
+            currentCommandedRightAnkleRot_ = rAnkleRot_[iter];
+            currentRobotPhase_ = robotPhase_[iter];
 
         // find control state of robot
         int traj_index = findTrajIndex(trajSizes_, trajSizes_.size(), iter);
@@ -1072,7 +1090,7 @@ bool Robot::getJointAngs(int iter, double config[12], double jnt_vel[12], double
         }
 
         // cout << currentCommandedCoMPos_(0) << ", " << currentCommandedCoMPos_(1) << ", " << currentCommandedCoMPos_(2) << ", ";
-        // cout << currentCommandedLeftAnklePos_(0) << ", " << currentCommandedLeftAnklePos_(1) << ", " << currentCommandedLeftAnklePos_(2) << ", ";
+        cout << currentCommandedLeftAnklePos_(0) << ", " << currentCommandedRightAnklePos_(0) << ", ";
         // cout << currentCommandedRightAnklePos_(0) << ", " << currentCommandedRightAnklePos_(1) << ", " << currentCommandedRightAnklePos_(2) << endl;  
 
         this->spinOnline(robot_config, robot_jnt_vel, right_torque, left_torque, right_ft[0], left_ft[0],
@@ -1087,6 +1105,120 @@ bool Robot::getJointAngs(int iter, double config[12], double jnt_vel[12], double
     return true;
 }
 
+
+// In Robot.cpp
+
+void Robot::handMotion(double t_step, int step_count, double max_angle_deg, double dt, bool isLeftFirst)
+{
+    // 1. --- SETUP ---
+    rightArmswingTraj_.clear();
+    leftArmswingTraj_.clear();
+    if (step_count <= 0 || t_step <= 0 || dt <= 0) return;
+
+    double max_angle_rad = max_angle_deg * (M_PI / 180.0);
+
+    // --- KEY PARAMETERS BASED ON YOUR GAIT SCHEDULE ---
+
+
+    const int initial_pause_samples = 610; // for left angle firs
+    // const int initial_pause_samples = 410; // for right angle first
+    const int swing_samples = 180;         // 0.9s / 0.005s per sample = 180 samples
+    const int double_support_samples = 20; // 0.1s / 0.005s per sample = 20 samples
+    const int total_step_samples = swing_samples + double_support_samples; // Should be 200
+
+    // Calculate total size needed. Add a buffer at the end just in case.
+    int total_samples = initial_pause_samples + (step_count * total_step_samples) + 200; // Extra 1s buffer
+    rightArmswingTraj_.assign(total_samples, 0.0);
+    leftArmswingTraj_.assign(total_samples, 0.0);
+
+    // Determine the starting swing direction for the RIGHT arm.
+    int initial_swing_direction = isLeftFirst ? 1 : -1;
+
+    // A variable to keep track of our current position in the trajectory array.
+    int current_sample_index = initial_pause_samples;
+
+    // --- 2. GENERATE TRAJECTORY BASED ON EXPLICIT PHASES ---
+
+    // --- PHASE 1: FIRST STEP (0 -> PEAK) ---
+    double first_peak = initial_swing_direction * max_angle_rad;
+    for (int i = 0; i < swing_samples; ++i)
+    {
+        // Use a half-sine wave to move from 0 to the first peak.
+        double t_in_phase = i * dt;
+        double q = first_peak * sin((M_PI / (2.0 * (swing_samples * dt))) * t_in_phase);
+        rightArmswingTraj_[current_sample_index] = q;
+        current_sample_index++;
+    }
+    // Hold at the first peak for the double support phase.
+    for (int i = 0; i < double_support_samples; ++i)
+    {
+        rightArmswingTraj_[current_sample_index] = first_peak;
+        current_sample_index++;
+    }
+
+    // --- PHASE 2: MIDDLE STEPS (PEAK -> OPPOSITE PEAK) ---
+    // We loop for all steps EXCEPT the first and the last one.
+    for (int step = 1; step < step_count - 1; ++step)
+    {
+        // Determine the start and end points for this swing.
+        double start_peak = initial_swing_direction * max_angle_rad * pow(-1, step - 1);
+        double end_peak = -start_peak;
+
+        for (int i = 0; i < swing_samples; ++i)
+        {
+            // Use a full cosine wave to interpolate between the two peaks.
+            double t_in_phase = i * dt;
+            double q = start_peak - (start_peak - end_peak) / 2.0 * (1 - cos((M_PI / (swing_samples * dt)) * t_in_phase));
+            rightArmswingTraj_[current_sample_index] = q;
+            current_sample_index++;
+        }
+        // Hold at the new peak for the double support phase.
+        for (int i = 0; i < double_support_samples; ++i)
+        {
+            rightArmswingTraj_[current_sample_index] = end_peak;
+            current_sample_index++;
+        }
+    }
+
+    // --- PHASE 3: LAST STEP (PEAK -> 0) ---
+    // Determine the last peak the arm was holding.
+    double last_peak = initial_swing_direction * max_angle_rad * pow(-1, step_count - 2);
+    for (int i = 0; i < swing_samples; ++i)
+    {
+        // Use a half-cosine wave to move from the last peak back to zero.
+        double t_in_phase = i * dt;
+        double q = last_peak * cos((M_PI / (2.0 * (swing_samples * dt))) * t_in_phase);
+        rightArmswingTraj_[current_sample_index] = q;
+        current_sample_index++;
+    }
+    // Hold at zero for the final double support phase.
+    for (int i = 0; i < double_support_samples; ++i)
+    {
+        rightArmswingTraj_[current_sample_index] = 0.0;
+        current_sample_index++;
+    }
+
+    // --- Final Step: Generate the opposite trajectory for the left arm ---
+    for(size_t i = 0; i < rightArmswingTraj_.size(); ++i)
+    {
+        leftArmswingTraj_[i] = -rightArmswingTraj_[i];
+    }
+}
+
+void Robot::getArmAnglesForIteration(int iter, double& right_armswing_rad, double& left_armswing_rad)
+{
+    right_armswing_rad = 0.0;
+    left_armswing_rad = 0.0;
+
+    if (!rightArmswingTraj_.empty() && iter >= 0 && iter < rightArmswingTraj_.size()) {
+        right_armswing_rad = rightArmswingTraj_[iter];
+    }
+
+    if (!leftArmswingTraj_.empty() && iter >= 0 && iter < leftArmswingTraj_.size()) {
+        left_armswing_rad = leftArmswingTraj_[iter];
+    }
+}
+
 bool Robot::resetTraj()
 {
     DCMPlanner_ = nullptr;
@@ -1099,6 +1231,9 @@ bool Robot::resetTraj()
     rAnklePos_.clear();
     lAnkleRot_.clear();
     rAnkleRot_.clear();
+    rightArmswingTraj_.clear();
+    leftArmswingTraj_.clear();
+
 
     trajSizes_.clear();
     robotControlState_.clear();

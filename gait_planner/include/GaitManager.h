@@ -140,6 +140,8 @@ private:
     double baseOrient_[3];
     double baseAngVel_[3];
     double commandConfig_[3][12];
+    int encoderResolution[2];
+    int harmonicRatio[4];
 
     int FTOffsetPeriod_;
     int trajSize_;

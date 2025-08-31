@@ -11,5 +11,6 @@ float64 theta
 float64 step_height
 float64 com_offset
 bool is_config
+float32 hand_swing_angle   
 ---
 bool result

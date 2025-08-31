@@ -122,6 +122,9 @@ public:
         return dataSize_;
     }
 
+    void handMotion(double t_step, int step_count, double max_angle_deg, double dt, bool isLeftFirst = true);
+    void getArmAnglesForIteration(int iter, double& right_armswing_rad, double& left_armswing_rad);
+
 private:
     GeneralMotion *generalPlanner_;
     DCMPlanner *DCMPlanner_;
@@ -232,5 +235,7 @@ private:
     ButterworthFilter* butterworthfilter_;
 
     Vector3d lZMP_;
-    Vector3d rZMP_;
+    Vector3d rZMP_;    
+    std::vector<double> rightArmswingTraj_;
+    std::vector<double> leftArmswingTraj_;
 };
