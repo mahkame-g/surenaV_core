@@ -7,7 +7,7 @@ HandManager::HandManager(ros::NodeHandle *n) :
     // Initialize parameters
     T(0.005),
     rate(200),
-    simulation(true),
+    simulation(false),
     X(1.0), Y(0.0), Z(0.0),
     tempX(1.0), tempY(0.0), tempZ(0.0),
     h_pitch(0), h_roll(0), h_yaw(0),
@@ -271,20 +271,20 @@ bool HandManager::single_hand(hand_planner::move_hand_single::Request &req, hand
                 q_motor[13]=-int(q_rad(1)*encoderResolution[0]*harmonicRatio[1]/M_PI/2);
                 q_motor[14]=int(q_rad(2)*encoderResolution[1]*harmonicRatio[2]/M_PI/2);
                 q_motor[15]=-int(q_rad(3)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
-                // Note: Right Wrist calculations should be added here
-                // q_motor[21] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_R.wrist_left_calc(q_rad(5), q_rad(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
-                // q_motor[20] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_R.wrist_right_calc(q_rad(5), q_rad(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
-                // q_motor[22] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((q_rad(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+                // Right Wrist calculations
+                q_motor[23] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((q_rad(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+                q_motor[24] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_R.wrist_right_calc(q_rad(5), q_rad(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
+                q_motor[25] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_R.wrist_left_calc(q_rad(5), q_rad(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
             } else {
                 VectorXd q_rad = qref_l.col(id);
                 q_motor[16]=-int(q_rad(0)*encoderResolution[0]*harmonicRatio[0]/M_PI/2);
                 q_motor[17]=-int(q_rad(1)*encoderResolution[0]*harmonicRatio[1]/M_PI/2);
                 q_motor[18]=int(q_rad(2)*encoderResolution[1]*harmonicRatio[2]/M_PI/2);
                 q_motor[19]=-int(q_rad(3)*encoderResolution[1]*harmonicRatio[3]/M_PI/2);
-                // Note: Left Wrist calculations should be added here
-                q_motor[21] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((q_rad(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
-                q_motor[22] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_right_calc(q_rad(5), q_rad(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
-                q_motor[20] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_left_calc(q_rad(5), q_rad(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
+                // Left Wrist calculations
+                q_motor[26] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((q_rad(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+                q_motor[27] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_right_calc(q_rad(5), q_rad(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
+                q_motor[28] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * (((hand_func_L.wrist_left_calc(q_rad(5), q_rad(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
             }
             std_msgs::Int32MultiArray trajectory_data;
             for(int i = 0; i < 29; i++) { 
