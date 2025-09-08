@@ -684,7 +684,7 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
             // Set the motor commands for the physical robot's arms
             motorCommandArray_[12] = -int(right_armswing_rad * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
             motorCommandArray_[16] =  int(left_armswing_rad  * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
-            cout << right_armswing_rad << ", " << left_armswing_rad << endl;
+            // cout << right_armswing_rad << ", " << left_armswing_rad << endl;
             
             // For debugging:
             // cout << motorCommandArray_[12] << ", " << motorCommandArray_[16] << endl;

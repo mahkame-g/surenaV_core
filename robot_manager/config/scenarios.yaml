@@ -42,6 +42,7 @@ scenarios:
         step_height: 0.0
         com_offset: 0.01
         is_config: false
+        hand_swing_angle: 15
     - service: "/move_hand_single_srv"
       blocking: true
       params:
