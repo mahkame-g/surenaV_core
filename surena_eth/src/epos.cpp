@@ -591,25 +591,63 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions)
 
     static int palmID = 0;
 
-    // if(palmID < 3)
-    // {
-    //     command.append();
-    // }
-
-    command.append(0x02);
-    command.append(0x81);
-
-    command.append(6);
-
-    command.append(motorPositions[23]);
-    command.append(motorPositions[24]);
-    command.append(motorPositions[25]);
-
-    command.append(motorPositions[26]);
-    command.append(motorPositions[27]);
-    command.append(motorPositions[28]);
     
-    command.append(motorPositions[0]);
+    // QLOG_TRACE() << motorPositions[23] << " " << motorPositions[24] << " " << motorPositions[25];    
+    
+    if(palmID == 0)
+    {
+        command.append(0x02);
+        command.append(0x81);
+
+        command.append(6);
+
+        command.append(motorPositions[23]);
+        command.append(motorPositions[24]);
+        command.append(motorPositions[25]);
+
+        command.append(motorPositions[26]);
+        command.append(motorPositions[27]);
+        command.append(motorPositions[28]);
+
+        command.append(motorPositions[0]);
+        palmID++;
+    } 
+    else if (palmID == 1) 
+    {
+        command.append(0x02);
+        command.append(0x81);
+
+        command.append(6);
+
+        command.append(motorPositions[23]);
+        command.append(motorPositions[24]);
+        command.append(motorPositions[25]);
+
+        command.append(motorPositions[26]);
+        command.append(motorPositions[27]);
+        command.append(motorPositions[28]);
+
+        command.append(motorPositions[0]);
+        palmID++;
+    } 
+    else if (palmID == 2)
+    {
+        command.append(0x02);
+        command.append(0x81);
+
+        command.append(6);
+
+        command.append(motorPositions[23]);
+        command.append(motorPositions[24]);
+        command.append(motorPositions[25]);
+
+        command.append(motorPositions[26]);
+        command.append(motorPositions[27]);
+        command.append(motorPositions[28]);
+
+        command.append(motorPositions[0]);
+        palmID = 0;
+    }
 
     return command;
 }

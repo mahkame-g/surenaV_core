@@ -60,16 +60,18 @@ GaitManager::GaitManager(ros::NodeHandle *n)
 
     collision_ = false;
 
-    for (int i = 0; i < 26; i++)
+    for (int i = 0; i < 29; i++)
     {
         if (i < 20)
             motorCommandArray_[i] = 0;
         else if (i == 20) // head roll
-            motorCommandArray_[i] = 145;
+            motorCommandArray_[i] = 150;
         else if (i == 21) // head pitch
-            motorCommandArray_[i] = 165;
-        else if (i >= 22) // head yaw
-            motorCommandArray_[i] = 145;
+            motorCommandArray_[i] = 160;
+        else if (i == 22) // head yaw
+            motorCommandArray_[i] = 150;
+        else if (i >= 23 && i <= 28) // wrist joints
+            motorCommandArray_[i] = 90;
         
     }
 
@@ -118,7 +120,7 @@ GaitManager::GaitManager(ros::NodeHandle *n)
 bool GaitManager::sendCommand()
 {
     motorCommand_.data.clear();
-    for (int i = 0; i < 26; i++) {
+    for (int i = 0; i < 29; i++) {
         motorCommand_.data.push_back(motorCommandArray_[i]);
         // cout << motorCommandArray_[i] << ","; 
     }
@@ -693,8 +695,9 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
             robot->getArmAnglesForIteration(iter, right_armswing_rad, left_armswing_rad);
 
             // Set the motor commands for the physical robot's arms
-            motorCommandArray_[12] = -int(right_armswing_rad * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
-            motorCommandArray_[16] =  int(left_armswing_rad  * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
+            motorCommandArray_[12] = int(right_armswing_rad * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
+            motorCommandArray_[16] = -int(left_armswing_rad  * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
+            motorCommandArray_[23] = 90;
             // cout << right_armswing_rad << ", " << left_armswing_rad << endl;
             
             // For debugging:

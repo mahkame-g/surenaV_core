@@ -151,18 +151,6 @@ void Robot::NewjointDataReceived()
     for(int i=0; i<34-len ; i++)
         _motorPosition.append(0);
 
-    // motor offset dynamixel
-    _motorPosition[24]+=3000;
-    _motorPosition[25]+=(2050-300);
-    _motorPosition[26]+=2050;
-    _motorPosition[16]+=2300;
-    _motorPosition[17]+=2050;
-    _motorPosition[18]+=2050;
-
-    _motorPosition[29]+=2048;
-    _motorPosition[30]+=3080;
-    _motorPosition[31]+=2048;
-    _motorPosition[32]+=2051;
 
     Epos4.SetAllPositionCST(_motorPosition);
 }

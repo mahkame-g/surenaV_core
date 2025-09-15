@@ -1,22 +1,24 @@
 #pragma once
-
 #ifndef HAND_MANAGER_H
 #define HAND_MANAGER_H
 
 #include "S5_hand.h"
 #include "MinimumJerkInterpolation.h"
+#include "hand_motion_utils.h"
+#include "handwriting.h"
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Core"
 #include <vector>
 #include <string>
 #include <iostream>
-#include <fstream> 
+#include <fstream>
 #include <ros/ros.h>
 #include <ros/package.h>
 #include "json.hpp"
 #include <deque>
+#include <mutex>
 
-// ROS Message and Service Includes
+// msgs & srvs
 #include <std_srvs/Empty.h>
 #include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Float64MultiArray.h>
@@ -27,6 +29,10 @@
 #include "hand_planner/home_service.h"
 #include "hand_planner/SetTargetClass.h"
 #include "hand_planner/head_track.h"
+#include "hand_planner/WriteString.h"
+#include "hand_planner/PickAndMove.h"
+#include "hand_planner/KeyboardJog.h"
+#include "hand_planner/MoveHandGeneral.h"
 
 using namespace std;
 using namespace Eigen;
@@ -34,11 +40,9 @@ using json = nlohmann::json;
 
 class HandManager {
 public:
-    // --- CONSTRUCTOR ---
     HandManager(ros::NodeHandle *n);
 
 private:
-    // --- ROS COMMUNICATION HANDLES ---
     ros::Publisher trajectory_data_pub;
     ros::Publisher gazeboJointStatePub_;
     ros::Subscriber camera_data_sub;
@@ -52,13 +56,15 @@ private:
     ros::ServiceServer set_target_class_service;
     ros::ServiceServer head_track_service;
     ros::ServiceServer teleoperation_service;
+    ros::ServiceServer write_string_service_;
+    ros::ServiceServer move_hand_relative_service_;
+    ros::ServiceServer move_hand_keyboard_service_;
+    ros::ServiceServer move_hand_general_service_;
 
-    // --- CORE OBJECTS ---
     S5_hand hand_func_R;
     S5_hand hand_func_L;
     MinimumJerkInterpolation coef_generator;
 
-    // --- STATE & TRAJECTORY VARIABLES ---
     VectorXd q_ra;
     VectorXd q_la;
     VectorXd q_init_r;
@@ -73,7 +79,6 @@ private:
     std_msgs::Float64MultiArray joint_angles_gazebo_;
     VectorXd q_rad_teleop;
 
-    // --- PARAMETERS ---
     double T;
     int rate;
     bool simulation;
@@ -83,28 +88,26 @@ private:
     vector<int> pitch_command_range, roll_command_range, yaw_command_range;
     vector<int> wrist_command_range, wrist_yaw_range, wrist_right_range, wrist_left_range;
 
-    // --- VISION & ONLINE GRASPING VARIABLES ---
     double X, Y, Z;
     double tempX, tempY, tempZ;
     double h_pitch, h_roll, h_yaw;
     double Kp, Ky;
     double t_grip;
-    int target_class_id_ = 41; // Default: "cup"
+    int target_class_id_ = 41;
     std::mutex target_mutex_;
     double micArray_theta;
     std::deque<double> micArray_data_buffer;
 
-    // --- ROS CALLBACKS (Declarations) ---
     void object_detect_callback(const hand_planner::DetectionInfoArray &msg);
     void joint_qc_callback(const std_msgs::Int32MultiArray::ConstPtr &qcArray);
     void teleoperation_callback(const std_msgs::Float64MultiArray &q_deg_teleop);
     void micArray_callback(const std_msgs::Float64 &msg);
 
-    // --- REFACTORED CORE LOGIC (Declarations) ---
     MatrixXd scenario_target(HandType type, string scenario, int i, VectorXd ee_pos, string ee_ini_pos);
     VectorXd reach_target(S5_hand& hand_model, VectorXd& q_arm, MatrixXd& qref_arm, double& sum_arm, VectorXd& q_init_arm, MatrixXd targets, string scenario, int M);
 
-    // --- ROS SERVICE HANDLERS (Declarations) ---
+    void publishMotorData(const VectorXd& q_rad_right, const VectorXd& q_rad_left, const Vector3d& head_angles);
+
     bool single_hand(hand_planner::move_hand_single::Request &req, hand_planner::move_hand_single::Response &res);
     bool both_hands(hand_planner::move_hand_both::Request &req, hand_planner::move_hand_both::Response &res);
     bool home(hand_planner::home_service::Request &req, hand_planner::home_service::Response &res);
@@ -112,6 +115,10 @@ private:
     bool setTargetClassService(hand_planner::SetTargetClass::Request &req, hand_planner::SetTargetClass::Response &res);
     bool head_track_handler(hand_planner::head_track::Request &req, hand_planner::head_track::Response &res);
     bool teleoperation_handler(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res);
+    bool write_string_handler(hand_planner::WriteString::Request &req, hand_planner::WriteString::Response &res);
+    bool move_hand_relative_handler(hand_planner::PickAndMove::Request &req, hand_planner::PickAndMove::Response &res);
+    bool move_hand_keyboard_handler(hand_planner::KeyboardJog::Request &req, hand_planner::KeyboardJog::Response &res);
+    bool move_hand_general_handler(hand_planner::MoveHandGeneral::Request &req, hand_planner::MoveHandGeneral::Response &res);
 };
 
-#endif // HAND_MANAGER_H
+#endif

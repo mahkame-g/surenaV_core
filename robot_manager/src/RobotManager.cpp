@@ -127,6 +127,7 @@ bool RobotManager::execute_step(const YAML::Node& step) {
         srv.request.step_height = params["step_height"].as<double>();
         srv.request.com_offset = params["com_offset"].as<double>();
         srv.request.is_config = params["is_config"].as<bool>();
+        srv.request.hand_swing_angle = params["hand_swing_angle"].as<double>();
         if (!client.call(srv)) { ROS_ERROR("Service call to %s failed.", service_name.c_str()); return false; }
         return srv.response.result;
     

@@ -122,9 +122,6 @@ void Robot::spinOnline(double config[], double jnt_vel[], Vector3d torque_r, Vec
 {
     updateRobotState(config, jnt_vel, torque_r, torque_l, f_r, f_l, gyro, accelerometer);
 
-
-    
-
     double f_r_filtered = butterworthfilter_-> FilterData(100, 200, f_r);
 
     if (!bumpSensorCalibrated_ && currentRobotPhase_ == 0)
@@ -169,16 +166,9 @@ void Robot::spinOnline(double config[], double jnt_vel[], Vector3d torque_r, Vec
 
     if (!rightArmswingTraj_.empty() && index_ < rightArmswingTraj_.size()) {
         q_gazebo[12] = rightArmswingTraj_[index_]; // Place right arm angle in the Gazebo message
-        // q_gazebo[13] = 0.0; 
-        // q_gazebo[14] = 0.0; 
-        // q_gazebo[15] = 0.0; 
-
     }
     if (!leftArmswingTraj_.empty() && index_ < leftArmswingTraj_.size()) {
         q_gazebo[16] = leftArmswingTraj_[index_]; // Place left arm angle in the Gazebo message
-        // q_gazebo[17] = 0.0; 
-        // q_gazebo[18] = 0.0; 
-        // q_gazebo[19] = 0.0;
     }
 
     joint_angles_gazebo_.data.clear();
@@ -1090,7 +1080,7 @@ bool Robot::getJointAngs(int iter, double config[12], double jnt_vel[12], double
         }
 
         // cout << currentCommandedCoMPos_(0) << ", " << currentCommandedCoMPos_(1) << ", " << currentCommandedCoMPos_(2) << ", ";
-        cout << currentCommandedLeftAnklePos_(0) << ", " << currentCommandedRightAnklePos_(0) << ", ";
+        // cout << currentCommandedLeftAnklePos_(0) << ", " << currentCommandedRightAnklePos_(0) << ", ";
         // cout << currentCommandedRightAnklePos_(0) << ", " << currentCommandedRightAnklePos_(1) << ", " << currentCommandedRightAnklePos_(2) << endl;  
 
         this->spinOnline(robot_config, robot_jnt_vel, right_torque, left_torque, right_ft[0], left_ft[0],
