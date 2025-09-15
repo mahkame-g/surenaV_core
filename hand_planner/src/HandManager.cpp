@@ -52,6 +52,10 @@ HandManager::HandManager(ros::NodeHandle *n) :
     set_target_class_service = n->advertiseService("set_target_class_srv", &HandManager::setTargetClassService, this);
     head_track_service = n->advertiseService("head_track_srv", &HandManager::head_track_handler, this);
     teleoperation_service = n->advertiseService("teleoperation_srv", &HandManager::teleoperation_handler, this);
+    write_string_service_        = n->advertiseService("write_string_srv",        &HandManager::write_string_handler, this);
+    move_hand_relative_service_  = n->advertiseService("move_hand_relative_srv",  &HandManager::move_hand_relative_handler, this);
+    move_hand_keyboard_service_  = n->advertiseService("move_hand_keyboard_srv",  &HandManager::move_hand_keyboard_handler, this);
+    move_hand_general_service_   = n->advertiseService("move_hand_general_srv",   &HandManager::move_hand_general_handler, this);
 }
 
 // --- Object Detection Callback Implementations ---
@@ -80,7 +84,7 @@ void HandManager::object_detect_callback(const hand_planner::DetectionInfoArray 
             double z_pixel = msg.detections[i].y + msg.detections[i].height / 2.0;
             double a = 0.5, b = 0.4, X0 = 0.5;
             int L = 640, W = 480;
-            
+
             double Y0 = -(y_pixel - L / 2.0) / L * a;
             double Z0 = -(z_pixel - W / 2.0) / W * b;
             double L0 = sqrt(pow(X0, 2) + pow(Y0, 2) + pow(Z0, 2));
@@ -126,7 +130,6 @@ void HandManager::micArray_callback(const std_msgs::Float64 &msg) {
     }
 }
 
-// --- Refactored Core Logic Implementations ---
 MatrixXd HandManager::scenario_target(HandType type, string scenario, int i, VectorXd ee_pos, string ee_ini_pos) {
     MatrixXd result(6, 3);
     VectorXd r_middle, r_target, r_start;
@@ -143,7 +146,7 @@ MatrixXd HandManager::scenario_target(HandType type, string scenario, int i, Vec
         R_target = hand_func.rot(2, -65 * M_PI / 180, 3);
     } else if (scenario == "respect") {
         r_middle = (type == RIGHT) ? Vector3d(0.3, -0.1, -0.3) : Vector3d(0.3, 0.1, -0.3);
-        r_target = (type == RIGHT) ? Vector3d(0.3, 0.1, -0.3) : Vector3d(0.3, -0.1, -0.3);
+        r_target = (type == RIGHT) ? Vector3d(0.25, 0.2, -0.3) : Vector3d(0.3, -0.1, -0.3);
         double rot_angle = (type == RIGHT) ? 60 * M_PI / 180 : -60 * M_PI / 180;
         R_target = hand_func.rot(2, -80 * M_PI / 180, 3) * hand_func.rot(1, rot_angle, 3);
     } else if (scenario == "byebye") {
@@ -302,6 +305,7 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
             trajectory_data.data.push_back(q_motor[i]); 
         }
         trajectory_data_pub.publish(trajectory_data);
+        // cout << q_motor[12] << ',' << q_motor[13] << ',' << q_motor[14] << ',' << q_motor[15] << ','<< q_motor[23] << ','<< q_motor[24] << ','<< q_motor[25] <<endl;
     } else { // simulation
         // Right hand joints
         q_gazebo[12] = q_rad_right(0);  
@@ -364,13 +368,13 @@ bool HandManager::single_hand(hand_planner::move_hand_single::Request &req, hand
     for (int id = 0; id < M; ++id) {
         if (type == RIGHT) {
             VectorXd q_rad = qref_r.col(id);
-            VectorXd q_rad_left = VectorXd::Zero(7); // zero vector for left hand
-            Vector3d head_angles(0, 0, 0); // zero for no head movement
+            VectorXd q_rad_left = VectorXd::Zero(7);
+            Vector3d head_angles(0, 0, 0);
             publishMotorData(q_rad, q_rad_left, head_angles);
         } else {
-            VectorXd q_rad_right = VectorXd::Zero(7); // zero vector for right hand
+            VectorXd q_rad_right = VectorXd::Zero(7);
             VectorXd q_rad = qref_l.col(id);
-            Vector3d head_angles(0, 0, 0); // zero for no head movement
+            Vector3d head_angles(0, 0, 0);
             publishMotorData(q_rad_right, q_rad, head_angles);
         }
         ros::spinOnce();
@@ -408,7 +412,7 @@ bool HandManager::both_hands(hand_planner::move_hand_both::Request &req, hand_pl
     for (int id = 0; id < M; ++id) {
         VectorXd q_rad_r = qref_r.col(id);
         VectorXd q_rad_l = qref_l.col(id);
-        Vector3d head_angles(0, 0, 0); // zero for no head movement
+        Vector3d head_angles(0, 0, 0);
         publishMotorData(q_rad_r, q_rad_l, head_angles);
         ros::spinOnce();
         rate_.sleep();
@@ -419,10 +423,9 @@ bool HandManager::both_hands(hand_planner::move_hand_both::Request &req, hand_pl
     sum_l = 0;
     next_ini_ee_posR = ee_pos_r;
     next_ini_ee_posL = ee_pos_l;
-    
+
     res.ee_fnl_posR = req.scenarioR.empty() ? "" : req.scenarioR[req.scenR_count - 1];
     res.ee_fnl_posL = req.scenarioL.empty() ? "" : req.scenarioL[req.scenL_count - 1];
-    
     return true;
 }
 
@@ -437,7 +440,7 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
     current_q_ra << 10, -10, 0, -25, 0, 0, 0;
     current_q_ra *= M_PI / 180.0;
     VectorXd initial_q_ra = current_q_ra;
-    
+
     Matrix3d R_target_r = Matrix3d::Identity();
 
     t_grip = 0;
@@ -468,7 +471,7 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
         }
 
         VectorXd q_delta = current_q_ra - initial_q_ra;
-        VectorXd q_rad_left = VectorXd::Zero(7); // zero vector for left hand
+        VectorXd q_rad_left = VectorXd::Zero(7);
         Vector3d head_angles(h_roll, h_pitch, h_yaw);
         publishMotorData(q_delta, q_rad_left, head_angles);
         ros::spinOnce();
@@ -504,8 +507,8 @@ bool HandManager::head_track_handler(hand_planner::head_track::Request &req, han
             h_yaw = max(-60.0 * M_PI / 180, min(60.0 * M_PI / 180, h_yaw));
         }
 
-        VectorXd q_rad_right = VectorXd::Zero(7); // zero vector for right hand
-        VectorXd q_rad_left = VectorXd::Zero(7); // zero vector for left hand
+        VectorXd q_rad_right = VectorXd::Zero(7);
+        VectorXd q_rad_left = VectorXd::Zero(7);
         Vector3d head_angles(h_roll, h_pitch, h_yaw);
         publishMotorData(q_rad_right, q_rad_left, head_angles);
         ros::spinOnce();
@@ -520,15 +523,321 @@ bool HandManager::teleoperation_handler(std_srvs::Empty::Request &req, std_srvs:
     ros::Rate rate_(rate);
     ros::Time start_time = ros::Time::now();
     while (ros::ok() && (ros::Time::now() - start_time).toSec() < 120) {
-        // Extract right and left hand joint angles from teleoperation data
-        VectorXd q_rad_right = q_rad_teleop.segment(0, 7);  // First 7 elements (right hand)
-        VectorXd q_rad_left = q_rad_teleop.segment(7, 7);   // Next 7 elements (left hand)
-        Vector3d head_angles(0, 0, 0); // zero for no head movement
+        VectorXd q_rad_right = q_rad_teleop.segment(0, 7);
+        VectorXd q_rad_left = q_rad_teleop.segment(7, 7);
+        Vector3d head_angles(0, 0, 0);
         publishMotorData(q_rad_right, q_rad_left, head_angles);
         ros::spinOnce();
         rate_.sleep();
     }
-    ROS_INFO("Teleoperation time finished.");
+    return true;
+}
+
+
+bool HandManager::write_string_handler(hand_planner::WriteString::Request &req, hand_planner::WriteString::Response &res) {
+    VectorXd q(7);
+    q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+
+    Vector3d r_target(0.45, 0.02, 0.03);
+    Matrix3d R_target = hand_func_R.rot(2, -140.0*M_PI/180.0, 3)
+                      * hand_func_R.rot(1,  -25.0*M_PI/180.0, 3)
+                      * hand_func_R.rot(3,   30.0*M_PI/180.0, 3);
+
+    auto pub = [&](const VectorXd& qr){
+        VectorXd ql = VectorXd::Zero(7);
+        publishMotorData(qr, ql, Vector3d(0,0,0));
+    };
+
+    if (!approachWhiteboard(hand_func_R, coef_generator, q, r_target, R_target, T, pub)) { res.success=false; return true; }
+    writeStringCore(hand_func_R, q, req.data, r_target, R_target, T, pub);
+    res.success = true;
+    return true;
+}
+
+bool HandManager::move_hand_relative_handler(hand_planner::PickAndMove::Request &req, hand_planner::PickAndMove::Response &res) {
+    VectorXd q(7);
+    q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+
+    Matrix3d R_pick = hand_func_R.rot(2, -100.0*M_PI/180.0, 3);
+    Vector3d mid(0.15, -0.15, -0.30);
+    Vector3d goal(0.35, -0.10, -0.20);
+
+    auto pub = [&](const VectorXd& qr){
+        VectorXd ql = VectorXd::Zero(7);
+        publishMotorData(qr, ql, Vector3d(0,0,0));
+    };
+
+    if (!approachViaOneMid(hand_func_R, coef_generator, q, mid, goal, R_pick, 3.0, 3.0, T, pub)) {
+        res.ok = false; res.message = "approach failed"; return true;
+    }
+
+    if (req.axes.size() != req.deltas.size() || req.axes.size() != req.durations.size()) {
+        res.ok=false; res.message="size mismatch"; return true;
+    }
+
+    double MAX_DX = 0.08, MAX_DYZ = 0.30, MIN_DUR = 0.2;
+    for (size_t i=0;i<req.axes.size();++i){
+        char ax=0; for(char c: req.axes[i]){ if (std::isalpha((unsigned char)c)){ char u=std::toupper((unsigned char)c); if(u=='X'||u=='Y'||u=='Z'){ ax=u; break; } } }
+        if (!ax) continue;
+        double d=req.deltas[i], dur=std::max(req.durations[i], MIN_DUR);
+        Vector3d dxyz(0,0,0);
+        if (ax=='X'){ d = std::max(std::min(d, MAX_DX), -MAX_DX); dxyz(0)=d; }
+        else if (ax=='Y'){ d = std::max(std::min(d, MAX_DYZ), -MAX_DYZ); dxyz(1)=d; }
+        else { d = std::max(std::min(d, MAX_DYZ), -MAX_DYZ); dxyz(2)=d; }
+        if (!moveRelative(hand_func_R, coef_generator, q, dxyz, goal, R_pick, dur, T, pub)) { res.ok=false; res.message="move failed"; return true; }
+    }
+
+    res.ok=true; res.message="ok";
+    return true;
+}
+
+bool HandManager::move_hand_keyboard_handler(hand_planner::KeyboardJog::Request &req,
+                                             hand_planner::KeyboardJog::Response &res)
+{
+    VectorXd q(7);
+    q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    S5_hand& H = hand_func_R;
+    H.HO_FK_palm(q);
+
+    {
+        Eigen::Vector3d mid(0.15, -0.15, -0.30);
+        Eigen::Vector3d goal(0.35, -0.10, -0.20);
+        Matrix3d Rg = H.rot(2, -100.0*M_PI/180.0, 3);
+        double T1 = 3.0, T2 = 3.0;
+        MinimumJerkInterpolation mj;
+        MatrixXd t(1,3); t<<0.0, T1, T1+T2;
+
+        H.HO_FK_palm(q);
+        Vector3d r0 = H.r_palm;
+        MatrixXd Px(1,3),Py(1,3),Pz(1,3); Px<<r0(0),mid(0),goal(0); Py<<r0(1),mid(1),goal(1); Pz<<r0(2),mid(2),goal(2);
+        const double INF = std::numeric_limits<double>::infinity();
+        MatrixXd Vx(1,3),Vy(1,3),Vz(1,3),Ax(1,3),Ay(1,3),Az(1,3);
+        Vx<<0,INF,0; Vy<<0,INF,0; Vz<<0,INF,0; Ax<<0,INF,0; Ay<<0,INF,0; Az<<0,INF,0;
+        MatrixXd ord(1,2); ord.fill(5);
+        MatrixXd conx(3,3),cony(3,3),conz(3,3); conx<<Px,Vx,Ax; cony<<Py,Vy,Ay; conz<<Pz,Vz,Az;
+
+        MatrixXd Xc = mj.Coefficient1(t, ord, conx, 0.1).transpose();
+        MatrixXd Yc = mj.Coefficient1(t, ord, cony, 0.1).transpose();
+        MatrixXd Zc = mj.Coefficient1(t, ord, conz, 0.1).transpose();
+
+        ros::Rate rate_(rate);
+        for (double tt=0; tt<(T1+T2); tt+=T) {
+            int seg = (tt < T1) ? 0 : 1;
+            Vector3d V(
+                mj.GetAccVelPos(Xc.row(seg), tt, 0, 5)(0,1),
+                mj.GetAccVelPos(Yc.row(seg), tt, 0, 5)(0,1),
+                mj.GetAccVelPos(Zc.row(seg), tt, 0, 5)(0,1)
+            );
+            H.update_hand(q, V, goal, Rg);
+            H.doQP(q);
+            q = H.q_next;
+
+            VectorXd qL = VectorXd::Zero(7);
+            Vector3d head(0,0,0);
+            publishMotorData(q, qL, head);
+
+            ros::spinOnce();
+            rate_.sleep();
+        }
+    }
+
+    termios oldt; bool tty_ok=false;
+    {
+        if (tcgetattr(STDIN_FILENO, &oldt) == 0) {
+            termios newt = oldt; newt.c_lflag &= ~(ICANON | ECHO);
+            tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+            int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+            fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+            tty_ok = true;
+        }
+    }
+
+    auto restoreTTY = [&](){
+        if (tty_ok) tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    };
+
+    ros::Rate rate_(rate);
+    ros::WallTime last_input = ros::WallTime::now();
+    const double STEP_T = 1.0; 
+    const double MAX_DX = 0.08;      
+    const double MAX_DYZ = 0.30;   
+
+    auto doRelative = [&](double dx, double dy, double dz, double dur){
+        H.HO_FK_palm(q);
+        Vector3d r0 = H.r_palm;
+        MinimumJerkInterpolation mj;
+
+        MatrixXd t(1,2); t<<0.0, dur;
+        MatrixXd Px(1,2),Py(1,2),Pz(1,2);
+        Px<<r0(0), r0(0)+dx;
+        Py<<r0(1), r0(1)+dy;
+        Pz<<r0(2), r0(2)+dz;
+
+        MatrixXd Vx(1,2),Vy(1,2),Vz(1,2),Ax(1,2),Ay(1,2),Az(1,2);
+        Vx<<0,0; Vy<<0,0; Vz<<0,0; Ax<<0,0; Ay<<0,0; Az<<0,0;
+        MatrixXd ord(1,1); ord.fill(5);
+        MatrixXd conx(3,2), cony(3,2), conz(3,2); conx<<Px,Vx,Ax; cony<<Py,Vy,Ay; conz<<Pz,Vz,Az;
+
+        MatrixXd Xc = mj.Coefficient1(t, ord, conx, 0.1).transpose();
+        MatrixXd Yc = mj.Coefficient1(t, ord, cony, 0.1).transpose();
+        MatrixXd Zc = mj.Coefficient1(t, ord, conz, 0.1).transpose();
+
+        Vector3d goal = r0 + Vector3d(dx,dy,dz);
+        Matrix3d Rg   = H.rot(2, -100.0*M_PI/180.0, 3);
+
+        for (double tt=0; tt<dur; tt+=T) {
+            Vector3d V(
+                mj.GetAccVelPos(Xc.row(0), tt, 0, 5)(0,1),
+                mj.GetAccVelPos(Yc.row(0), tt, 0, 5)(0,1),
+                mj.GetAccVelPos(Zc.row(0), tt, 0, 5)(0,1)
+            );
+
+            H.update_hand(q, V, goal, Rg);
+            H.doQP(q);
+            q = H.q_next;
+
+            VectorXd qL = VectorXd::Zero(7);
+            Vector3d head(0,0,0);
+            publishMotorData(q, qL, head);
+
+            ros::spinOnce();
+            rate_.sleep();
+        }
+    };
+
+    ROS_INFO("keyboard: W/S => Z+/Z- , D/A => Y+/Y- , E/Q => X+/X- , X => exit");
+    bool exit_to_home = false;
+
+    while (ros::ok()) {
+        if ( (ros::WallTime::now() - last_input).toSec() > 60.0 ){
+            exit_to_home = true;
+            break;
+        }
+
+        fd_set set; FD_ZERO(&set); FD_SET(STDIN_FILENO, &set);
+        timeval tv{0, 50000}; // 50ms
+        int rv = select(STDIN_FILENO+1, &set, NULL, NULL, &tv);
+        if (rv > 0 && FD_ISSET(STDIN_FILENO, &set)) {
+            char ch=0;
+            if (read(STDIN_FILENO, &ch, 1) == 1) {
+                double dx=0, dy=0, dz=0; bool end=false, valid=false;
+                switch (ch) {
+                    case 'w': case 'W': dz = +0.10; valid=true; break; // Upward
+                    case 's': case 'S': dz = -0.10; valid=true; break; // Downward
+                    case 'd': case 'D': dy = +0.10; valid=true; break; // To the left
+                    case 'a': case 'A': dy = -0.10; valid=true; break; // To the right
+                    case 'e': case 'E': dx = +0.05; valid=true; break; // Forward
+                    case 'q': case 'Q': dx = -0.05; valid=true; break; // Backward
+                    case 'x': case 'X': end=true; break;
+                    default: break;
+                }
+                if (end) { restoreTTY(); res.ok=true; res.message="exit"; return true; }
+                if (valid) {
+                    if (dx!=0) dx = std::max(std::min(dx,  MAX_DX),  -MAX_DX);
+                    if (dy!=0) dy = std::max(std::min(dy,  MAX_DYZ), -MAX_DYZ);
+                    if (dz!=0) dz = std::max(std::min(dz,  MAX_DYZ), -MAX_DYZ);
+                    doRelative(dx,dy,dz, STEP_T);
+                    last_input = ros::WallTime::now();
+                }
+            }
+        }
+        ros::spinOnce();
+    }
+
+    restoreTTY();
+    res.ok = true; res.message = "timeout";
+    return true;
+}
+
+bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Request &req, hand_planner::MoveHandGeneral::Response &res) {
+    VectorXd q(7);
+    q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    Vector3d r_target(0.45, 0.02, 0.03);
+    Matrix3d R_target0 = hand_func_R.rot(2, -140.0*M_PI/180.0, 3)
+                       * hand_func_R.rot(1,  -25.0*M_PI/180.0, 3)
+                       * hand_func_R.rot(3,   30.0*M_PI/180.0, 3);
+
+    auto pub = [&](const VectorXd& qr){
+        VectorXd ql = VectorXd::Zero(7);
+        publishMotorData(qr, ql, Vector3d(0,0,0));
+    };
+
+    ROS_INFO("abs/rel midx midy midz gx gy gz rx ry rz");
+
+    const double T1 = 3.0, T2 = 3.0;
+    const double TIMEOUT = 200.0;
+
+    while (ros::ok()) {
+        std::string line;
+        bool got = readLineWithTimeout(line, TIMEOUT);
+        if (!got) {
+            goHome(hand_func_R, q, q, 5.0, T, pub);
+            res.ok = true; res.message = "timeout-home";
+            return true;
+        }
+        auto trim = [](std::string &s){
+            while (!s.empty() && std::isspace((unsigned char)s.back())) s.pop_back();
+            size_t i=0; while (i<s.size() && std::isspace((unsigned char)s[i])) ++i;
+            s = s.substr(i);
+        };
+        trim(line);
+        if (line.empty()) continue;
+        if (line.size()==1 && (line[0]=='x' || line[0]=='X')) {
+            goHome(hand_func_R, q, q, 5.0, T, pub);
+            res.ok = true; res.message = "user-exit-home";
+            return true;
+        }
+
+        std::istringstream iss(line);
+        std::string mode; if (!(iss >> mode)) continue;
+
+        std::vector<double> vals; double tmp; while (iss >> tmp) vals.push_back(tmp);
+        bool is_abs = (mode=="abs" || mode=="ABS" || mode=="Abs");
+        bool have_mid = false;
+
+        double mx,my,mz, gx,gy,gz, rx,ry,rz;
+        if (vals.size() == 9) {
+            have_mid = true;
+            mx = vals[0]; my = vals[1]; mz = vals[2];
+            gx = vals[3]; gy = vals[4]; gz = vals[5];
+            rx = vals[6]; ry = vals[7]; rz = vals[8];
+        } else if (vals.size() == 6) {
+            have_mid = false;
+            gx = vals[0]; gy = vals[1]; gz = vals[2];
+            rx = vals[3]; ry = vals[4]; rz = vals[5];
+        } else { continue; }
+
+        hand_func_R.HO_FK_palm(q);
+        Vector3d r0 = hand_func_R.r_palm;
+
+        const double RX = rx * M_PI/180.0;
+        const double RY = ry * M_PI/180.0;
+        const double RZ = rz * M_PI/180.0;
+        Matrix3d R_inc = hand_func_R.rot(2, RY, 3)
+                       * hand_func_R.rot(1, RX, 3)
+                       * hand_func_R.rot(3, RZ, 3);
+
+        Matrix3d R0 = R_target0;
+        Vector3d r_goal, mid;
+
+        if (is_abs) {
+            r_goal = Vector3d(gx, gy, gz);
+            if (have_mid) mid = Vector3d(mx, my, mz);
+            else { mid = 0.5 * (r0 + r_goal); mid(1) -= 0.1; }
+        } else {
+            r_goal = r0 + Vector3d(gx, gy, gz);
+            if (have_mid) mid = r0 + Vector3d(mx, my, mz);
+            else { mid = 0.5 * (r0 + r_goal); mid(1) -= 0.1; }
+        }
+        Matrix3d R_goal = is_abs ? R_inc : (R0 * R_inc);
+
+        if (!approachViaOneMid(hand_func_R, coef_generator, q, mid, r_goal, R_goal, T1, T2, T, pub)) {
+            continue;
+        }
+    }
+
+    goHome(hand_func_R, q, q, 5.0, T, pub);
+    res.ok = true; res.message = "ros-shutdown-home";
     return true;
 }
 
