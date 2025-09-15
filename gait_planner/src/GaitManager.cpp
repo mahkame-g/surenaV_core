@@ -41,6 +41,7 @@ GaitManager::GaitManager(ros::NodeHandle *n)
     qcInitialBool_ = false;
     isKeyboardTrajectoryEnabled = false;
     isWalkingWithKeyboard = false;
+ 
 
     int temp_ratio[12] = {100, 100, 50, 80, 100, 100, 50, 80, 120, 120, 120, 120};
     // int temp_home_abs[12] = {122378, 141666, 134313, 8607, 132216, 130155, 144401, 146847, 125254, 63296, 130474, 145216};
@@ -598,15 +599,25 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
     ros::Rate rate_(rate);
     double dt = 0.005;
     double COM_height;
+    int step_count;
+    double t_step;
+    double hand_swing_angle;
 
     string walk_config_path = ros::package::getPath("gait_planner") + "/config/walk_config.json";
     std::ifstream f(walk_config_path);
     json walk_config = json::parse(f);
-    if (req.is_config)
+    if (req.is_config){
         COM_height = walk_config["COM_height"];
-    else
+        hand_swing_angle = walk_config["hand_swing_angle"];
+        t_step = walk_config["t_step"];
+        step_count = walk_config["footsteps"].size() - 2;
+    }
+    else{
         COM_height = req.COM_height;
-
+        hand_swing_angle = req.hand_swing_angle;
+        t_step = req.t_step;
+        step_count = req.step_count;
+    }
     double init_com_pos[3] = {0, 0, 0.71};
     double init_com_orient[3] = {0, 0, 0};
     double final_com_pos[3] = {0, 0, COM_height};
@@ -656,9 +667,9 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
     // int final_iter = robot->OnlineDCMTrajGen(req.step_count, req.t_step, req.alpha, req.t_double_support, req.COM_height, req.step_length,
     //                                          req.step_width, dt, req.theta, req.ankle_height, req.step_height, 0, req.com_offset, req.is_config);
 
-    if (req.hand_swing_angle > 0)
+    if (hand_swing_angle > 0)
     {
-        robot->handMotion(req.t_step, req.step_count, req.hand_swing_angle, dt, false);
+        robot->handMotion(t_step, step_count, hand_swing_angle, dt, false);
     }
 
     int iter = 0;
@@ -684,7 +695,7 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
             // Set the motor commands for the physical robot's arms
             motorCommandArray_[12] = -int(right_armswing_rad * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
             motorCommandArray_[16] =  int(left_armswing_rad  * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
-            cout << right_armswing_rad << ", " << left_armswing_rad << endl;
+            // cout << right_armswing_rad << ", " << left_armswing_rad << endl;
             
             // For debugging:
             // cout << motorCommandArray_[12] << ", " << motorCommandArray_[16] << endl;
