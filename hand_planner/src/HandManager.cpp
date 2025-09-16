@@ -38,6 +38,13 @@ HandManager::HandManager(ros::NodeHandle *n) :
     q_rad_teleop.resize(14);
     q_rad_teleop.setZero();
 
+    // initial position
+    q_right_state_.resize(7);
+    q_right_state_ << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    R_right_state_.setIdentity();
+    right_state_init_ = true;
+    
+
     // ROS Communication Setup
     trajectory_data_pub = n->advertise<std_msgs::Int32MultiArray>("jointdata/qc", 100);
     gazeboJointStatePub_ = n->advertise<std_msgs::Float64MultiArray>("/joint_angles_gazebo", 100);
@@ -437,8 +444,7 @@ bool HandManager::home(hand_planner::home_service::Request &req, hand_planner::h
 bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_planner::gripOnline::Response &res) {
     ros::Rate rate_(rate);
     VectorXd current_q_ra(7);
-    current_q_ra << 10, -10, 0, -25, 0, 0, 0;
-    current_q_ra *= M_PI / 180.0;
+    current_q_ra << q_right_state_;
     VectorXd initial_q_ra = current_q_ra;
 
     Matrix3d R_target_r = Matrix3d::Identity();
@@ -479,7 +485,9 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
         t_grip += T;
     }
 
+
     res.finish = "end";
+    q_right_state_= current_q_ra;
     return true;
 }
 
@@ -536,7 +544,7 @@ bool HandManager::teleoperation_handler(std_srvs::Empty::Request &req, std_srvs:
 
 bool HandManager::write_string_handler(hand_planner::WriteString::Request &req, hand_planner::WriteString::Response &res) {
     VectorXd q(7);
-    q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    q << q_right_state_;
 
     Vector3d r_target(0.45, 0.02, 0.03);
     Matrix3d R_target = hand_func_R.rot(2, -140.0*M_PI/180.0, 3)
@@ -551,6 +559,7 @@ bool HandManager::write_string_handler(hand_planner::WriteString::Request &req, 
     if (!approachWhiteboard(hand_func_R, coef_generator, q, r_target, R_target, T, pub)) { res.success=false; return true; }
     writeStringCore(hand_func_R, q, req.data, r_target, R_target, T, pub);
     res.success = true;
+    q_right_state_ = q;
     return true;
 }
 
@@ -588,6 +597,7 @@ bool HandManager::move_hand_relative_handler(hand_planner::PickAndMove::Request 
     }
 
     res.ok=true; res.message="ok";
+    q_right_state_ = q;
     return true;
 }
 
@@ -595,7 +605,7 @@ bool HandManager::move_hand_keyboard_handler(hand_planner::KeyboardJog::Request 
                                              hand_planner::KeyboardJog::Response &res)
 {
     VectorXd q(7);
-    q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    q << q_right_state_;
     S5_hand& H = hand_func_R;
     H.HO_FK_palm(q);
 
@@ -746,66 +756,59 @@ bool HandManager::move_hand_keyboard_handler(hand_planner::KeyboardJog::Request 
 
     restoreTTY();
     res.ok = true; res.message = "timeout";
+    q_right_state_ = q;
     return true;
 }
 
-bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Request &req, hand_planner::MoveHandGeneral::Response &res) {
-    VectorXd q(7);
-    q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
-    Vector3d r_target(0.45, 0.02, 0.03);
-    Matrix3d R_target0 = hand_func_R.rot(2, -140.0*M_PI/180.0, 3)
-                       * hand_func_R.rot(1,  -25.0*M_PI/180.0, 3)
-                       * hand_func_R.rot(3,   30.0*M_PI/180.0, 3);
+bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Request &req,
+                                            hand_planner::MoveHandGeneral::Response &res)
+{
+    VectorXd q(7); 
+    q << q_right_state_;
+    const VectorXd q_init = q;
 
     auto pub = [&](const VectorXd& qr){
         VectorXd ql = VectorXd::Zero(7);
         publishMotorData(qr, ql, Vector3d(0,0,0));
     };
 
-    ROS_INFO("abs/rel midx midy midz gx gy gz rx ry rz");
-
     const double T1 = 3.0, T2 = 3.0;
-    const double TIMEOUT = 200.0;
+    bool user_exit = false;
 
-    while (ros::ok()) {
-        std::string line;
-        bool got = readLineWithTimeout(line, TIMEOUT);
-        if (!got) {
-            goHome(hand_func_R, q, q, 5.0, T, pub);
-            res.ok = true; res.message = "timeout-home";
-            return true;
-        }
-        auto trim = [](std::string &s){
-            while (!s.empty() && std::isspace((unsigned char)s.back())) s.pop_back();
-            size_t i=0; while (i<s.size() && std::isspace((unsigned char)s[i])) ++i;
-            s = s.substr(i);
-        };
+    auto trim = [](std::string &s){
+        while (!s.empty() && std::isspace((unsigned char)s.back())) s.pop_back();
+        size_t i=0; while (i<s.size() && std::isspace((unsigned char)s[i])) ++i;
+        s = s.substr(i);
+    };
+
+    for (const std::string& raw : req.commands) {
+        std::string line = raw;
         trim(line);
         if (line.empty()) continue;
-        if (line.size()==1 && (line[0]=='x' || line[0]=='X')) {
-            goHome(hand_func_R, q, q, 5.0, T, pub);
-            res.ok = true; res.message = "user-exit-home";
-            return true;
-        }
+        if (line.size()==1 && (line[0]=='x' || line[0]=='X')) { user_exit = true; break; }
 
         std::istringstream iss(line);
-        std::string mode; if (!(iss >> mode)) continue;
+        std::string mode; 
+        if (!(iss >> mode)) continue;
 
-        std::vector<double> vals; double tmp; while (iss >> tmp) vals.push_back(tmp);
+        std::vector<double> vals; double tmp;
+        while (iss >> tmp) vals.push_back(tmp);
+
         bool is_abs = (mode=="abs" || mode=="ABS" || mode=="Abs");
-        bool have_mid = false;
+        bool is_rel = (mode=="rel" || mode=="REL" || mode=="Rel");
+        if (!is_abs && !is_rel) continue;
 
-        double mx,my,mz, gx,gy,gz, rx,ry,rz;
-        if (vals.size() == 9) {
-            have_mid = true;
+        double mx=0,my=0,mz=0, gx=0,gy=0,gz=0, rx=0,ry=0,rz=0;
+        if (is_abs) {
+            if (vals.size() != 9) { res.ok=false; res.message="abs needs 9 values"; return true; }
             mx = vals[0]; my = vals[1]; mz = vals[2];
             gx = vals[3]; gy = vals[4]; gz = vals[5];
             rx = vals[6]; ry = vals[7]; rz = vals[8];
-        } else if (vals.size() == 6) {
-            have_mid = false;
+        } else { // rel
+            if (vals.size() != 6) { res.ok=false; res.message="rel needs 6 values"; return true; }
             gx = vals[0]; gy = vals[1]; gz = vals[2];
             rx = vals[3]; ry = vals[4]; rz = vals[5];
-        } else { continue; }
+        }
 
         hand_func_R.HO_FK_palm(q);
         Vector3d r0 = hand_func_R.r_palm;
@@ -817,29 +820,50 @@ bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Reque
                        * hand_func_R.rot(1, RX, 3)
                        * hand_func_R.rot(3, RZ, 3);
 
-        Matrix3d R0 = R_target0;
         Vector3d r_goal, mid;
+        Matrix3d R_goal;
 
         if (is_abs) {
             r_goal = Vector3d(gx, gy, gz);
-            if (have_mid) mid = Vector3d(mx, my, mz);
-            else { mid = 0.5 * (r0 + r_goal); mid(1) -= 0.1; }
+            mid    = Vector3d(mx, my, mz);
+            R_goal = R_inc;
         } else {
             r_goal = r0 + Vector3d(gx, gy, gz);
-            if (have_mid) mid = r0 + Vector3d(mx, my, mz);
-            else { mid = 0.5 * (r0 + r_goal); mid(1) -= 0.1; }
+
+            mid = 0.5 * (r0 + r_goal);
+            mid(1) -= 0.10;
+
+            Matrix3d R0;
+            if (hand_func_R.R_palm.rows()==3 && hand_func_R.R_palm.cols()==3) {
+                R0 = hand_func_R.R_palm;
+            } else {
+                R0 = hand_func_R.R_palm.block<3,3>(0,0);
+            }
+            R_goal = R0 * R_inc;
         }
-        Matrix3d R_goal = is_abs ? R_inc : (R0 * R_inc);
+
+        ROS_INFO_STREAM("[move_hand_general rel/abs] r0="   << r0.transpose()
+                         << " mid="   << mid.transpose()
+                         << " goal="  << r_goal.transpose());
 
         if (!approachViaOneMid(hand_func_R, coef_generator, q, mid, r_goal, R_goal, T1, T2, T, pub)) {
-            continue;
+            res.ok = false; res.message = "approach failed";
+            if (req.go_home_on_finish) goHome(hand_func_R, q, q_init, 5.0, T, pub);
+            return true;
         }
     }
 
-    goHome(hand_func_R, q, q, 5.0, T, pub);
-    res.ok = true; res.message = "ros-shutdown-home";
+    if (req.go_home_on_finish) {
+        goHome(hand_func_R, q, q_init, 5.0, T, pub);
+        res.ok = true; res.message = user_exit ? "exit-home" : "done-home";
+    } else {
+        res.ok = true; res.message = user_exit ? "exit" : "done";
+    }
+
+    q_right_state_ = q;
     return true;
 }
+
 
 // // --- Main Function ---
 // int main(int argc, char **argv) {

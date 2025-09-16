@@ -79,9 +79,13 @@ private:
     std_msgs::Float64MultiArray joint_angles_gazebo_;
     VectorXd q_rad_teleop;
 
+    Eigen::VectorXd q_right_state_;
+    Eigen::Matrix3d R_right_state_;
+
     double T;
     int rate;
     bool simulation;
+    bool right_state_init_;
     int encoderResolution[2];
     int harmonicRatio[4];
     vector<int> pitch_range, roll_range, yaw_range;
