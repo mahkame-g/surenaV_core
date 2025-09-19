@@ -122,7 +122,7 @@ public:
         return dataSize_;
     }
 
-    void handMotion(double t_step, int step_count, double max_angle_deg, double dt, bool isLeftFirst = true);
+    void handMotion(double t_step, int step_count, double max_angle_deg, double dt, bool isLeftFirst = true, bool include_height_phases = true);
     void getArmAnglesForIteration(int iter, double& right_armswing_rad, double& left_armswing_rad);
 
 private:
