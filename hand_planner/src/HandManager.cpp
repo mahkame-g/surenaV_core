@@ -27,11 +27,11 @@ HandManager::HandManager(ros::NodeHandle *n) :
     pitch_range = {-30, 30};
     roll_range = {-50, 50};
     yaw_range = {-90, 90};
-    pitch_command_range = {180, 110};
-    roll_command_range = {100, 190};
+    pitch_command_range = {180, 140};
+    roll_command_range = {100, 200};
     yaw_command_range = {90, 210};
-    wrist_command_range = {50, 250};
-    wrist_yaw_range = {85, -95};
+    wrist_command_range = {0, 180};
+    wrist_yaw_range = {90, -90};
     wrist_right_range = {90, -90};
     wrist_left_range = {90, -90};
 
@@ -276,7 +276,7 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
         q_motor[16] = -int(q_rad_left(0) * encoderResolution[0] * harmonicRatio[0] / (2 * M_PI));
         q_motor[17] = -int(q_rad_left(1) * encoderResolution[0] * harmonicRatio[1] / (2 * M_PI));
         q_motor[18] = int(q_rad_left(2) * encoderResolution[1] * harmonicRatio[2] / (2 * M_PI));
-        q_motor[19] = -int(q_rad_left(3) * encoderResolution[1] * harmonicRatio[3] / (2 * M_PI));
+        q_motor[19] = int(q_rad_left(3) * encoderResolution[1] * harmonicRatio[3] / (2 * M_PI));
         
         // Head motors (indices 20-22) - roll, pitch, yaw
         q_motor[20] = int(roll_command_range[0] + (roll_command_range[1] - roll_command_range[0]) * 
@@ -287,24 +287,20 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
                          ((-(head_angles(2)*180/M_PI) - yaw_range[0]) / (yaw_range[1] - yaw_range[0])));
         
         // Wrist calculations for right hand (indices 23-25)
-        if (q_rad_right.size() >= 7) {
-            q_motor[23] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
-                             (((q_rad_right(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
-            q_motor[24] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
-                             (((hand_func_R.wrist_right_calc(q_rad_right(5), q_rad_right(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
-            q_motor[25] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
-                             (((hand_func_R.wrist_left_calc(q_rad_right(5), q_rad_right(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
-        }
-        
+        q_motor[23] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
+                            (((q_rad_right(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+        q_motor[24] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
+                            (((hand_func_R.wrist_right_calc(q_rad_right(5), q_rad_right(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
+        q_motor[25] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
+                            (((hand_func_R.wrist_left_calc(q_rad_right(5), q_rad_right(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
+    
         // Wrist calculations for left hand (indices 26-28)
-        if (q_rad_left.size() >= 7) {
-            q_motor[26] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
-                             (((q_rad_left(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
-            q_motor[27] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
-                             (((hand_func_L.wrist_right_calc(q_rad_left(5), q_rad_left(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
-            q_motor[28] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
-                             (((hand_func_L.wrist_left_calc(q_rad_left(5), q_rad_left(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
-        }
+        q_motor[26] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
+                            (((q_rad_left(4) * 180 / M_PI) - wrist_yaw_range[0]) / (wrist_yaw_range[1] - wrist_yaw_range[0])));
+        q_motor[27] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
+                            (((hand_func_L.wrist_right_calc(q_rad_left(5), q_rad_left(6))) - (wrist_right_range[0])) / (wrist_right_range[1] - (wrist_right_range[0]))));
+        q_motor[28] = int(wrist_command_range[0] + (wrist_command_range[1] - wrist_command_range[0]) * 
+                            (((hand_func_L.wrist_left_calc(q_rad_left(5), q_rad_left(6))) - wrist_left_range[0]) / (wrist_left_range[1] - wrist_left_range[0])));
         
         // Publish motor data
         std_msgs::Int32MultiArray trajectory_data;
@@ -332,18 +328,14 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
         q_gazebo[22] = -head_angles(2); // yaw
         
         // Wrist joints for right hand
-        if (q_rad_right.size() >= 7) {
-            q_gazebo[23] = q_rad_right(4);   
-            q_gazebo[24] = q_rad_right(5);  
-            q_gazebo[25] = q_rad_right(6);
-        }
+        q_gazebo[23] = q_rad_right(4);   
+        q_gazebo[24] = q_rad_right(5);  
+        q_gazebo[25] = q_rad_right(6);
         
         // Wrist joints for left hand
-        if (q_rad_left.size() >= 7) {
-            q_gazebo[26] = q_rad_left(4);   
-            q_gazebo[27] = q_rad_left(5);  
-            q_gazebo[28] = q_rad_left(6); 
-        }
+        q_gazebo[26] = q_rad_left(4);   
+        q_gazebo[27] = q_rad_left(5);  
+        q_gazebo[28] = q_rad_left(6); 
         
         // Publish gazebo data
         joint_angles_gazebo_.data.clear();
