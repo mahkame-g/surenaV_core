@@ -901,7 +901,7 @@ void GaitManager::keyboardHandler(const std_msgs::Int32 &msg)
         switch (command)
         {
         case 119: // w: move forward 
-            step_count = 10;
+            step_count = 4;
             step_length = 0.16;
             theta = 0.0;
             robot->trajGen(step_count, t_step, alpha, t_double_support, COM_height, step_length, 

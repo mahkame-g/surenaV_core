@@ -33,6 +33,7 @@
 #include "hand_planner/PickAndMove.h"
 #include "hand_planner/KeyboardJog.h"
 #include "hand_planner/MoveHandGeneral.h"
+#include "hand_planner/arm_back_to_home.h"
 
 using namespace std;
 using namespace Eigen;
@@ -60,6 +61,7 @@ private:
     ros::ServiceServer move_hand_relative_service_;
     ros::ServiceServer move_hand_keyboard_service_;
     ros::ServiceServer move_hand_general_service_;
+    ros::ServiceServer arm_back_to_home_service_;
 
     S5_hand hand_func_R;
     S5_hand hand_func_L;
@@ -73,6 +75,10 @@ private:
     MatrixXd qref_l;
     VectorXd next_ini_ee_posR;
     VectorXd next_ini_ee_posL;
+    vector<double> last_q_gazebo;
+    vector<double> last_q_motor;
+
+    
     double sum_r;
     double sum_l;
     int QcArr[29];
@@ -123,6 +129,7 @@ private:
     bool move_hand_relative_handler(hand_planner::PickAndMove::Request &req, hand_planner::PickAndMove::Response &res);
     bool move_hand_keyboard_handler(hand_planner::KeyboardJog::Request &req, hand_planner::KeyboardJog::Response &res);
     bool move_hand_general_handler(hand_planner::MoveHandGeneral::Request &req, hand_planner::MoveHandGeneral::Response &res);
+    bool arm_back_to_home_handler(hand_planner::arm_back_to_home::Request &req, hand_planner::arm_back_to_home::Response &res);
 };
 
 #endif
