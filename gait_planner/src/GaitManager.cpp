@@ -619,6 +619,7 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
         hand_swing_angle = req.hand_swing_angle;
         t_step = req.t_step;
         step_count = req.step_count;
+
     }
     double init_com_pos[3] = {0, 0, 0.71};
     double init_com_orient[3] = {0, 0, 0};
@@ -678,9 +679,6 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
     int final_iter = robot->getTrajSize();
     // int final_iter = req.t_step + 4;
 
-    // // vector<double> right_arm_traj;
-    // // vector<double> left_arm_traj;
-    // // handMotion(right_arm_traj, left_arm_traj, req.t_step, req.step_count, 0.2, req.dt);
 
     double jnt_command[12];
     int status;
@@ -688,20 +686,15 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
     while (iter < final_iter)
     {
 
-        if (req.hand_swing_angle > 0)
+        if (hand_swing_angle > 0)
         {
             double right_armswing_rad, left_armswing_rad;
-            // Get the angles for this time step from the Robot class
             robot->getArmAnglesForIteration(iter, right_armswing_rad, left_armswing_rad);
-
-            // Set the motor commands for the physical robot's arms
             motorCommandArray_[12] = int(right_armswing_rad * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
             motorCommandArray_[16] = -int(left_armswing_rad  * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
             motorCommandArray_[23] = 90;
             // cout << right_armswing_rad << ", " << left_armswing_rad << endl;
-            
-            // For debugging:
-            // cout << motorCommandArray_[12] << ", " << motorCommandArray_[16] << endl;
+            //cout << motorCommandArray_[12] << ", " << motorCommandArray_[16] << endl;
         }
 
 
