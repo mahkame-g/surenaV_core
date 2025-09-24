@@ -619,6 +619,7 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
         hand_swing_angle = req.hand_swing_angle;
         t_step = req.t_step;
         step_count = req.step_count;
+
     }
     double init_com_pos[3] = {0, 0, 0.71};
     double init_com_orient[3] = {0, 0, 0};
@@ -671,16 +672,13 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
 
     if (hand_swing_angle > 0)
     {
-        robot->handMotion(t_step, step_count, hand_swing_angle, dt, false);
+        robot->handMotion(t_step, step_count, hand_swing_angle, dt, false, true);
     }
 
     int iter = 0;
     int final_iter = robot->getTrajSize();
     // int final_iter = req.t_step + 4;
 
-    // // vector<double> right_arm_traj;
-    // // vector<double> left_arm_traj;
-    // // handMotion(right_arm_traj, left_arm_traj, req.t_step, req.step_count, 0.2, req.dt);
 
     double jnt_command[12];
     int status;
@@ -688,20 +686,15 @@ bool GaitManager::walk(gait_planner::Trajectory::Request &req,
     while (iter < final_iter)
     {
 
-        if (req.hand_swing_angle > 0)
+        if (hand_swing_angle > 0)
         {
             double right_armswing_rad, left_armswing_rad;
-            // Get the angles for this time step from the Robot class
             robot->getArmAnglesForIteration(iter, right_armswing_rad, left_armswing_rad);
-
-            // Set the motor commands for the physical robot's arms
             motorCommandArray_[12] = int(right_armswing_rad * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
             motorCommandArray_[16] = -int(left_armswing_rad  * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
             motorCommandArray_[23] = 90;
             // cout << right_armswing_rad << ", " << left_armswing_rad << endl;
-            
-            // For debugging:
-            // cout << motorCommandArray_[12] << ", " << motorCommandArray_[16] << endl;
+            //cout << motorCommandArray_[12] << ", " << motorCommandArray_[16] << endl;
         }
 
 
@@ -900,12 +893,16 @@ void GaitManager::keyboardHandler(const std_msgs::Int32 &msg)
     {
         switch (command)
         {
-        case 119: // w: move forward
+        case 119: // w: move forward 
             step_count = 4;
             step_length = 0.16;
             theta = 0.0;
             robot->trajGen(step_count, t_step, alpha, t_double_support, COM_height, step_length, 
                            step_width, dt, theta, ankle_height, step_height, slope, offset, is_config);
+            {
+            double hand_swing_angle_deg = 20.0;
+            robot->handMotion(t_step, step_count, hand_swing_angle_deg, dt, false, false);
+            }
             // trajSize_ = robot->OnlineDCMTrajGen(step_count, t_step, alpha, t_double_support, COM_height, step_length, 
             //                                     step_width, dt, theta, ankle_height, step_height, slope, offset, is_config);
 
@@ -1090,6 +1087,13 @@ bool GaitManager::keyboardWalk(std_srvs::Empty::Request &req, std_srvs::Empty::R
                 cout << "Node was shut down due to Ankle Collision!" << endl;
                 return false;
             }
+
+            double right_armswing_rad = 0.0, left_armswing_rad = 0.0;
+            robot->getArmAnglesForIteration(iter, right_armswing_rad, left_armswing_rad);
+            motorCommandArray_[12] = int(right_armswing_rad * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
+            motorCommandArray_[16] = -int(left_armswing_rad  * encoderResolution[0] * harmonicRatio[0] / M_PI / 2);
+            motorCommandArray_[23] = 90;
+
             computeLowerLimbJointMotion(jnt_command, iter);
             sendCommand();
             iter++;

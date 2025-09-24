@@ -70,6 +70,7 @@ add_service_files(
   PickAndMove.srv
   KeyboardJog.srv
   MoveHandGeneral.srv
+  arm_back_to_home.srv
 )
 
 ## Generate added messages and services with any dependencies listed here
