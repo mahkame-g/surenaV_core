@@ -357,47 +357,77 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
 }
 
 // --- Service Handler Implementations ---
-bool HandManager::single_hand(hand_planner::move_hand_single::Request &req, hand_planner::move_hand_single::Response &res) {
+bool HandManager::single_hand(hand_planner::move_hand_single::Request &req,
+                              hand_planner::move_hand_single::Response &res)
+{
     ros::Rate rate_(rate);
-    int M = req.t_total / T;
-    VectorXd ee_pos = Vector3d::Zero();
+    int M = std::max(1, (int)std::floor(req.t_total / T));
+    Eigen::VectorXd ee_pos = Eigen::Vector3d::Zero();
     HandType type = (req.mode == "righthand") ? RIGHT : LEFT;
+
     if (type == RIGHT) {
+        if (q_right_state_.size() == 7) q_ra = q_right_state_;
+        else {
+            q_ra.resize(7);
+            q_ra << 10.0*M_PI/180.0, -10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+        }
+        q_init_r = q_ra;
+
+        // set baseline once (first run after node start)
+        if (q_right_baseline_.size() != 7) q_right_baseline_ = q_init_r;
+
+        // make scenarios start from current EE pose
+        hand_func_R.HO_FK_palm(q_ra);
+        next_ini_ee_posR = hand_func_R.r_palm;
+
+        // build trajectory from current state
         for (int i = 0; i < req.scen_count; i++) {
-            MatrixXd result = scenario_target(RIGHT, req.scenario[i], i, ee_pos, req.ee_ini_pos);
+            Eigen::MatrixXd result = scenario_target(RIGHT, req.scenario[i], i, ee_pos, "prev");
             ee_pos = reach_target(hand_func_R, q_ra, qref_r, sum_r, q_init_r, result, req.scenario[i], M);
         }
-    } else {
+
+        for (int id = 0; id < qref_r.cols(); ++id) {
+            Eigen::VectorXd q_abs  = q_init_r + qref_r.col(id);
+            Eigen::VectorXd q_send = q_abs;
+            q_send.head(4) = q_abs.head(4) - q_right_baseline_.head(4);
+            Eigen::VectorXd q_left = Eigen::VectorXd::Zero(7);
+            Eigen::Vector3d head_angles(0,0,0);
+            publishMotorData(q_send, q_left, head_angles);
+            ros::spinOnce();
+            rate_.sleep();
+        }
+
+        // persist last absolute pose for next services
+        if (qref_r.cols() > 0) q_right_state_ = q_init_r + qref_r.col(qref_r.cols()-1);
+        else q_right_state_ = q_ra;
+
+        sum_r = 0;
+        next_ini_ee_posR = ee_pos;
+        res.ee_fnl_pos = req.scenario[req.scen_count - 1];
+        return true;
+    } 
+    else {
         for (int i = 0; i < req.scen_count; i++) {
-            MatrixXd result = scenario_target(LEFT, req.scenario[i], i, ee_pos, req.ee_ini_pos);
+            Eigen::MatrixXd result = scenario_target(LEFT, req.scenario[i], i, ee_pos, req.ee_ini_pos);
             ee_pos = reach_target(hand_func_L, q_la, qref_l, sum_l, q_init_l, result, req.scenario[i], M);
         }
-    }
 
-    for (int id = 0; id < M; ++id) {
-        if (type == RIGHT) {
-            VectorXd q_rad = qref_r.col(id);
-            VectorXd q_rad_left = VectorXd::Zero(7);
-            Vector3d head_angles(0, 0, 0);
-            publishMotorData(q_rad, q_rad_left, head_angles);
-        } else {
-            VectorXd q_rad_right = VectorXd::Zero(7);
-            VectorXd q_rad = qref_l.col(id);
-            Vector3d head_angles(0, 0, 0);
-            publishMotorData(q_rad_right, q_rad, head_angles);
+        for (int id = 0; id < M; ++id) {
+            Eigen::VectorXd q_rad_right = Eigen::VectorXd::Zero(7);
+            Eigen::VectorXd q_rad_left  = qref_l.col(id);
+            Eigen::Vector3d head_angles(0, 0, 0);
+            publishMotorData(q_rad_right, q_rad_left, head_angles);
+            ros::spinOnce();
+            rate_.sleep();
         }
-        ros::spinOnce();
-        rate_.sleep();
-    }
 
-    sum_r = 0; sum_l = 0;
-    if (type == RIGHT) { 
-        next_ini_ee_posR = ee_pos; } 
-    else { 
-        next_ini_ee_posL = ee_pos; }
-    res.ee_fnl_pos = req.scenario[req.scen_count - 1];
-    return true;
+        sum_l = 0;
+        next_ini_ee_posL = ee_pos;
+        res.ee_fnl_pos = req.scenario[req.scen_count - 1];
+        return true;
+    }
 }
+
 
 bool HandManager::both_hands(hand_planner::move_hand_both::Request &req, hand_planner::move_hand_both::Response &res) {
     ros::Rate rate_(rate);
@@ -445,11 +475,15 @@ bool HandManager::home(hand_planner::home_service::Request &req, hand_planner::h
 
 bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_planner::gripOnline::Response &res) {
     ros::Rate rate_(rate);
-    VectorXd current_q_ra(7);
-    current_q_ra << q_right_state_;
-    VectorXd initial_q_ra = current_q_ra;
 
-    Matrix3d R_target_r = Matrix3d::Identity();
+    Eigen::VectorXd current_q_ra(7);
+    Eigen::VectorXd q(7);
+    if (q_right_state_.size()==7) q = q_right_state_;
+    else q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    
+    current_q_ra = q;
+    Eigen::VectorXd initial_q_ra = current_q_ra;
+    Eigen::Matrix3d R_target_r = Matrix3d::Identity();
 
     t_grip = 0;
     while (t_grip <= (120)) {
@@ -631,12 +665,12 @@ void HandManager::hand_keyboard_callback(const std_msgs::Int32::ConstPtr& msg)
     int code = msg->data;
     double dx=0, dy=0, dz=0;
     switch (code) {
-        case 'r': case 'R': dx = +0.05; break;
-        case 'f': case 'F': dx = -0.05; break;
-        case 't': case 'T': dy = +0.10; break;
-        case 'g': case 'G': dy = -0.10; break;
-        case 'y': case 'Y': dz = +0.10; break;
-        case 'h': case 'H': dz = -0.10; break;
+        case 'w': case 'W': dx = +0.05; break; // Forward
+        case 's': case 'S': dx = -0.05; break; // Backward
+        case 'e': case 'E': dy = +0.10; break; // To the left
+        case 'd': case 'D': dy = -0.10; break; // To the right
+        case 'q': case 'Q': dz = +0.10; break; // Upward
+        case 'a': case 'A': dz = -0.10; break; // Downward
         default: return;
     }
 
@@ -674,13 +708,8 @@ bool HandManager::move_hand_keyboard_handler(hand_planner::KeyboardJog::Request 
                                              hand_planner::KeyboardJog::Response &res)
 {
     Eigen::VectorXd q(7);
-    if (q_right_state_.size()!=7) {
-        q.resize(7);
-        q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0; // اولین بار
-    } else {
-        q = q_right_state_;
-    }
-
+    if (q_right_state_.size()==7) q = q_right_state_;
+    else q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
     Eigen::Vector3d mid(0.15, -0.15, -0.30);
     Eigen::Vector3d goal(0.35, -0.10, -0.20);
     Eigen::Matrix3d Rg = hand_func_R.rot(2, -100.0*M_PI/180.0, 3);
@@ -707,11 +736,21 @@ bool HandManager::move_hand_keyboard_handler(hand_planner::KeyboardJog::Request 
 bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Request &req,
                                             hand_planner::MoveHandGeneral::Response &res)
 {
-    VectorXd q(7);
-    if (q_right_state_.size()==7) q = q_right_state_;
-    else q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    using Eigen::Vector3d;
+    using Eigen::VectorXd;
+    using Eigen::Matrix3d;
 
-    if (q_right_baseline_.size()!=7) q_right_baseline_ = q;
+    VectorXd q(7);
+    if (q_right_state_.size() == 7) {
+        q = q_right_state_;
+    } else {
+        q.resize(7);
+        q << 10.0*M_PI/180.0, -10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+    }
+
+    if (q_right_baseline_.size() != 7) {
+        q_right_baseline_ = q;
+    }
 
     auto pub = [&](const VectorXd& q_abs){
         VectorXd q_send = q_abs;
@@ -736,56 +775,75 @@ bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Reque
         if (line.size()==1 && (line[0]=='x' || line[0]=='X')) { user_exit = true; break; }
 
         std::istringstream iss(line);
-        std::string mode; if (!(iss >> mode)) continue;
+        std::string mode; 
+        if (!(iss >> mode)) continue;
 
-        std::vector<double> vals; double tmp; while (iss >> tmp) vals.push_back(tmp);
+        std::vector<double> vals; 
+        double tmp; 
+        while (iss >> tmp) vals.push_back(tmp);
 
-        bool is_abs = (mode=="abs" || mode=="ABS" || mode=="Abs");
+        bool is_abs = (mode=="abs" || mode=="ABS");
+
+        double mx=0, my=0, mz=0, gx=0, gy=0, gz=0, rx=0, ry=0, rz=0;
         bool have_mid = false;
 
-        double mx,my,mz, gx,gy,gz, rx,ry,rz;
-
         if (is_abs) {
-            if (vals.size() != 9) continue;
-            have_mid = true;
-            mx = vals[0]; my = vals[1]; mz = vals[2];
-            gx = vals[3]; gy = vals[4]; gz = vals[5];
-            rx = vals[6]; ry = vals[7]; rz = vals[8];
+            if (vals.size() == 9) {
+                have_mid = true;
+                mx = vals[0]; my = vals[1]; mz = vals[2];
+                gx = vals[3]; gy = vals[4]; gz = vals[5];
+                rx = vals[6]; ry = vals[7]; rz = vals[8];
+            } else if (vals.size() == 6) {
+                have_mid = false;
+                gx = vals[0]; gy = vals[1]; gz = vals[2];
+                rx = vals[3]; ry = vals[4]; rz = vals[5];
+            } else {
+                continue;
+            }
         } else {
             if (vals.size() != 6) continue;
-            have_mid = false;
             gx = vals[0]; gy = vals[1]; gz = vals[2];
             rx = vals[3]; ry = vals[4]; rz = vals[5];
         }
 
         hand_func_R.HO_FK_palm(q);
         Vector3d r0 = hand_func_R.r_palm;
+        Matrix3d R0 = hand_func_R.R_palm.block<3,3>(0,0);
 
-        Matrix3d R_inc = hand_func_R.rot(2, ry * M_PI/180.0, 3)
-                       * hand_func_R.rot(1, rx * M_PI/180.0, 3)
-                       * hand_func_R.rot(3, rz * M_PI/180.0, 3);
+        const double RX = rx * M_PI/180.0;
+        const double RY = ry * M_PI/180.0;
+        const double RZ = rz * M_PI/180.0;
+
+        Matrix3d R_inc = hand_func_R.rot(2, RY, 3)
+                       * hand_func_R.rot(1, RX, 3)
+                       * hand_func_R.rot(3, RZ, 3);
 
         Vector3d r_goal, mid;
+        Matrix3d R_goal;
+
         if (is_abs) {
             r_goal = Vector3d(gx, gy, gz);
-            mid = Vector3d(mx, my, mz);
+            mid    = have_mid ? Vector3d(mx, my, mz) : 0.5*(r0 + r_goal);
+            R_goal = R_inc;                
         } else {
             r_goal = r0 + Vector3d(gx, gy, gz);
-            mid = 0.5 * (r0 + r_goal);
-            mid(1) -= 0.1;
+            mid    = 0.5*(r0 + r_goal);   
+            R_goal = R0 * R_inc;          
         }
-        Matrix3d R_goal = R_inc;
 
         if (!approachViaOneMid(hand_func_R, coef_generator, q, mid, r_goal, R_goal, T1, T2, T, pub)) {
-            res.ok = false; res.message = "approach failed"; q_right_state_ = q; return true;
+            res.ok = false; 
+            res.message = "approach failed";
+            q_right_state_ = q;
+            return true;
         }
     }
 
     q_right_state_ = q;
-    res.ok = true; res.message = user_exit ? "exit" : "done";
+    res.ok = true; 
+    res.message = user_exit ? "exit" : "done";
     return true;
 }
-
 
 
 // // --- Main Function ---
