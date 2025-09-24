@@ -85,6 +85,10 @@ public slots:
     void CleanAndExit();
     //=================================================================================================
     void NewjointDataReceived( );
+    void NewFingerJointDataReceived( );
+    
+private:
+    QList<int> _currentMotorPosition; // Store current motor positions
     //=================================================================================================
     void Timeout();
     //=================================================================================================

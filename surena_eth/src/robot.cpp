@@ -19,6 +19,7 @@ Robot::Robot(QObject *parent, int argc, char **argv)
     pos=0;
     connect(_rosNode,SIGNAL(rosShutdown()),this,SLOT(CleanAndExit()));
     connect(_rosNode,SIGNAL(NewjointDataReceived()),this,SLOT(NewjointDataReceived()));
+    connect(_rosNode,SIGNAL(NewFingerJointDataReceived()),this,SLOT(NewFingerJointDataReceived()));
     connect(_rosNode,SIGNAL(SetActiveCSP(int)),this,SLOT(ActiveCSP(int)));
     connect(_rosNode,SIGNAL(DoResetAllNodes(int)),this,SLOT(ResetAllNodes(int)));
     connect(_rosNode,SIGNAL(DoResetLegs()),this,SLOT(ResetLegs()));
@@ -150,9 +151,24 @@ void Robot::NewjointDataReceived()
     }
     for(int i=0; i<34-len ; i++)
         _motorPosition.append(0);
-
-
+    
+    _currentMotorPosition = _motorPosition;
     Epos4.SetAllPositionCST(_motorPosition);
+}
+//=================================================================================================
+void Robot::NewFingerJointDataReceived()
+{
+    //  qDebug()<<"get new finger data..."<<_rosNode->FingerJointsData.data.at(0);
+    QList<int> _fingerMotorPosition;
+    int len=_rosNode->FingerJointsData.data.size() ;
+    for(int i=0; i<len ; i++)
+    {
+        _fingerMotorPosition.append(_rosNode->FingerJointsData.data.at(i));
+    }
+    for(int i=0; i<18-len ; i++)
+        _fingerMotorPosition.append(0);
+
+    Epos4.SetAllPositionCST(_currentMotorPosition, _fingerMotorPosition);
 }
 //=================================================================================================
 void  Robot::FeedBackReceived(QList<int16_t> ft, QList<int32_t> positions,QList<int32_t> positionsInc,QList<uint16_t> bump_sensor_list,QList<float> imu_data_list, float* pressureData)

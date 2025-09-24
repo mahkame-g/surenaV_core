@@ -71,6 +71,7 @@ private:
     bool _nodeInitialized=false;
     int _lastOperationResult=0;
     ros::Subscriber _jointsSubscriber;
+    ros::Subscriber _fingerJointsSubscriber;
     ros::Publisher chatter_publisher;
     ros::Publisher _imuPublisher,_jointPublisher,_incJointPublisher,_bumpPublisher,_rigthtFtPublisher,_leftFtPublisher,_pressurePublisher;
     QStringListModel logging_model;
@@ -99,6 +100,7 @@ public:
     QString RobotStatus;
     QString teststr="";
     std_msgs::Int32MultiArray  JointsData;
+    std_msgs::Int32MultiArray  FingerJointsData;
     QList<double> ActualPositions;
     QList<double> IncPositions;
     int BumpSensor[8];
@@ -126,6 +128,7 @@ public:
 	void Log( const LogLevel &level, const std_msgs::Float64 &msg);
     //=================================================================================================
     void NewJointDataReady(const std_msgs::Int32MultiArray &msg);
+    void NewFingerJointDataReady(const std_msgs::Int32MultiArray &msg);
     //=================================================================================================
     bool ActiveCSP(robot_teleop::active_csp::Request &req, robot_teleop::active_csp::Response &res);
     bool ActivateLegs(robot_teleop::node::Request &req, robot_teleop::node::Response &res);
@@ -150,6 +153,7 @@ Q_SIGNALS:
     void rosShutdown();
     //=================================================================================================
     void NewjointDataReceived();
+    void NewFingerJointDataReceived();
     //=================================================================================================
     void SetActiveCSP(int id);
     //=================================================================================================

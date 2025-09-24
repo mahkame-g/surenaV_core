@@ -585,21 +585,32 @@ inline QByteArray Epos::CreateServoHeadCommand(QList<int> motorPositions)
     return command;
 }
 //========================================================================
-inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions)
+inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> fingerMotorPositions)
 {
     QByteArray command;
 
     static int palmID = 0;
-
     
+    /*
+     * Finger Motor Data Structure:
+     * fingerMotorPositions[0-5]   : Right hand finger motors (Palm ID 1)
+     * fingerMotorPositions[6-11]  : Left hand finger motors (Palm ID 2)
+     * 
+     * Palm ID 0: Uses original motorPositions[23-28]
+     * Palm ID 1: Uses fingerMotorPositions[0-5] (right hand fingers)
+     * Palm ID 2: Uses fingerMotorPositions[6-11] (left hand fingers)
+     * 
+     * Each palm ID sends 6 motors with command ID and trigger
+    */
+
     // QLOG_TRACE() << motorPositions[23] << " " << motorPositions[24] << " " << motorPositions[25];    
     
-    if(palmID == 0)
+    if(palmID == 0) // wrist motors
     {
         command.append(0x02);
         command.append(0x81);
 
-        command.append(6);
+        command.append(9);
 
         command.append(motorPositions[23]);
         command.append(motorPositions[24]);
@@ -609,57 +620,55 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions)
         command.append(motorPositions[27]);
         command.append(motorPositions[28]);
 
-        command.append(motorPositions[0]);
+        command.append(1);
         palmID++;
     } 
-    else if (palmID == 1) 
+    else if (palmID == 1) // Right hand
     {
         command.append(0x02);
         command.append(0x81);
 
-        command.append(6);
+        command.append(fingerMotorPositions[12]); // Command ID byte
 
-        command.append(motorPositions[23]);
-        command.append(motorPositions[24]);
-        command.append(motorPositions[25]);
+        command.append(fingerMotorPositions[0]); // INDEX_FINGER    
+        command.append(fingerMotorPositions[1]); // MIDDLE_FINGER
+        command.append(fingerMotorPositions[2]); // RING_FINGER
+        command.append(fingerMotorPositions[3]); // LITTLE_FINGER
+        command.append(fingerMotorPositions[4]); // THUMB_FINGER
+        command.append(fingerMotorPositions[5]); // THUMB2_FINGER
 
-        command.append(motorPositions[26]);
-        command.append(motorPositions[27]);
-        command.append(motorPositions[28]);
-
-        command.append(motorPositions[0]);
+        command.append(fingerMotorPositions[13]);  // Trigger byte
         palmID++;
     } 
-    else if (palmID == 2)
+    else if (palmID == 2) // Left hand
     {
         command.append(0x02);
         command.append(0x81);
 
-        command.append(6);
+        command.append(fingerMotorPositions[14]); // Command ID byte
 
-        command.append(motorPositions[23]);
-        command.append(motorPositions[24]);
-        command.append(motorPositions[25]);
+        command.append(fingerMotorPositions[6]);  // INDEX_FINGER    
+        command.append(fingerMotorPositions[7]);  // MIDDLE_FINGER
+        command.append(fingerMotorPositions[8]);  // RING_FINGER
+        command.append(fingerMotorPositions[9]);  // LITTLE_FINGER
+        command.append(fingerMotorPositions[10]); // THUMB_FINGER
+        command.append(fingerMotorPositions[11]); // THUMB2_FINGER
 
-        command.append(motorPositions[26]);
-        command.append(motorPositions[27]);
-        command.append(motorPositions[28]);
-
-        command.append(motorPositions[0]);
+        command.append(fingerMotorPositions[15]);  // Trigger byte
         palmID = 0;
     }
 
     return command;
 }
 //========================================================================
-void Epos::SetAllPositionCST(QList<int> motorPositions)
+void Epos::SetAllPositionCST(QList<int> motorPositions, QList<int> fingerMotorPositions)
 {
 
     QByteArray command;
     for(int i=0; i< 12; i++)
         command.append(MotorDataToArray(0x401,motorPositions.at(i)));
     command.append(CreateHandPacket(motorPositions));
-    command.append(CreatePalmCommand(motorPositions));
+    command.append(CreatePalmCommand(motorPositions, fingerMotorPositions));
     command.append(CreateServoHeadCommand(motorPositions));
     //    //packet must be 300 bytes 180 byte zero
     command.append(QByteArray(ReserveByteCount, Qt::Initialization::Uninitialized));

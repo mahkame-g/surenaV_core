@@ -175,8 +175,8 @@ class Epos : public QObject
     QByteArray CreatePDOPacket(int canID, int value1, int value2);
     QByteArray CreateDynamixelPacket(int canID, int motorID, int motorPosition, int velocity);
     QByteArray CreateBumpRequestCommand();
-     QByteArray CreateServoHeadCommand(QList<int> motorPositions);
-    QByteArray CreatePalmCommand(QList<int> motorPositions);
+    QByteArray CreateServoHeadCommand(QList<int> motorPositions);
+    QByteArray CreatePalmCommand(QList<int> motorPositions, QList<int> fingerMotorPositions = QList<int>());
 
     bool IsValidRunPacket(QByteArray packet);
     void GetFTSensorDataFromPacket(EthernetReceivedPacketType *packet);
@@ -237,7 +237,7 @@ public:
     //================================================================================================================================================================
     //void SetPositionCST(int position, int velocity);
     //================================================================================================================================================================
-    void SetAllPositionCST(QList<int> motorPositions);
+    void SetAllPositionCST(QList<int> motorPositions, QList<int> fingerMotorPositions = QList<int>());
     //================================================================================================================================================================
     bool ActiveAllCSP();
     //================================================================================================================================================================
