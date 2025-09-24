@@ -20,6 +20,7 @@
 
 // msgs & srvs
 #include <std_srvs/Empty.h>
+#include <std_msgs/Int32.h>
 #include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Float64MultiArray.h>
 #include "hand_planner/DetectionInfoArray.h"
@@ -62,6 +63,12 @@ private:
     ros::ServiceServer move_hand_keyboard_service_;
     ros::ServiceServer move_hand_general_service_;
     ros::ServiceServer arm_back_to_home_service_;
+    ros::Subscriber hand_keyboard_sub_;
+  
+    ros::WallTime hand_keyboard_last_input_;
+    double hand_step_T_ = 1.0;
+    double hand_max_dx_ = 0.08; 
+    double hand_max_dyz_ = 0.30;
 
     S5_hand hand_func_R;
     S5_hand hand_func_L;
@@ -86,12 +93,14 @@ private:
     VectorXd q_rad_teleop;
 
     Eigen::VectorXd q_right_state_;
+    Eigen::VectorXd q_right_baseline_;
     Eigen::Matrix3d R_right_state_;
 
     double T;
     int rate;
     bool simulation;
     bool right_state_init_;
+    bool hand_keyboard_enabled_ =false;
     int encoderResolution[2];
     int harmonicRatio[4];
     vector<int> pitch_range, roll_range, yaw_range;
@@ -103,20 +112,21 @@ private:
     double h_pitch, h_roll, h_yaw;
     double Kp, Ky;
     double t_grip;
+    double micArray_theta;
     int target_class_id_ = 41;
     std::mutex target_mutex_;
-    double micArray_theta;
     std::deque<double> micArray_data_buffer;
 
     void object_detect_callback(const hand_planner::DetectionInfoArray &msg);
     void joint_qc_callback(const std_msgs::Int32MultiArray::ConstPtr &qcArray);
     void teleoperation_callback(const std_msgs::Float64MultiArray &q_deg_teleop);
     void micArray_callback(const std_msgs::Float64 &msg);
+    void hand_keyboard_callback(const std_msgs::Int32::ConstPtr& msg);
+    void publishMotorData(const VectorXd& q_rad_right, const VectorXd& q_rad_left, const Vector3d& head_angles);
 
     MatrixXd scenario_target(HandType type, string scenario, int i, VectorXd ee_pos, string ee_ini_pos);
     VectorXd reach_target(S5_hand& hand_model, VectorXd& q_arm, MatrixXd& qref_arm, double& sum_arm, VectorXd& q_init_arm, MatrixXd targets, string scenario, int M);
 
-    void publishMotorData(const VectorXd& q_rad_right, const VectorXd& q_rad_left, const Vector3d& head_angles);
 
     bool single_hand(hand_planner::move_hand_single::Request &req, hand_planner::move_hand_single::Response &res);
     bool both_hands(hand_planner::move_hand_both::Request &req, hand_planner::move_hand_both::Response &res);
