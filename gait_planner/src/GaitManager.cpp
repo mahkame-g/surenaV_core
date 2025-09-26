@@ -48,10 +48,11 @@ GaitManager::GaitManager(ros::NodeHandle *n)
     // int temp_home_abs[12] = {122378, 141090, 134441, 11167, 132216, 130155, 145297, 146399, 124358, 63552, 130474, 145216};
     //int temp_home_abs[12] = {122378, 141090, 135273, 11167, 132216, 130155, 145297, 146399, 124614, 63552, 130474, 145216};
     // int temp_home_abs[12] = {123722, 141090, 135273, 11167, 136504, 131243, 146513, 146399, 124614, 63552, 129130, 141904};
-    int temp_home_abs[12] = {123722, 166000, 135273, 11167, 132676, 131435, 146513, 146399, 124614, 63552, 132714, 141488};
+    // int temp_home_abs[12] = {123722, 166000, 135273, 11167, 132676, 131435, 146513, 146399, 124614, 63552, 132714, 141488};
+    int temp_home_abs[12] = {121674, 165602, 133545, 8543, 135032, 131243, 144913, 148255, 126278, 63168, 129706, 142032};
 
     int temp_abs_high[12] = {108426, 119010, 89733, 136440, 71608, 102443, 119697, 82527, 168562, 160000, 191978, 111376};
-    int temp_abs_low[12] = {145354, 183778, 194153, 7000, 203256, 160491, 150225, 180000, 61510, 61000, 61482, 172752};
+    int temp_abs_low[12] = {145354, 183778, 194153, 7000, 203256, 160491, 160225, 180000, 61510, 61000, 61482, 172752};
     int temp_abs2inc_dir[12] = {1, 1, -1, -1, -1, 1, 1, 1, -1, 1, 1, 1};
     int temp_abs_dir[12] = {-1, -1, -1, 1, -1, -1, -1, -1, 1, 1, 1, -1};
     int temp_motor_dir[12] = {1, 1, 1, -1, -1, 1, 1, 1, -1, 1, 1, -1};
@@ -923,7 +924,7 @@ void GaitManager::keyboardHandler(const std_msgs::Int32 &msg)
         case 97: // a: turn left
             step_count = 4;
             step_length = -0.15;
-            theta = 0.17;
+            theta = 0.12;
             robot->trajGen(step_count, t_step, alpha, t_double_support, COM_height, step_length, 
                            step_width, dt, theta, ankle_height, step_height, slope, offset, is_config);
             // trajSize_ = robot->OnlineDCMTrajGen(step_count, t_step, alpha, t_double_support, COM_height, step_length, 
@@ -934,7 +935,7 @@ void GaitManager::keyboardHandler(const std_msgs::Int32 &msg)
         case 100: // d: turn right
             step_count = 4;
             step_length = 0.15;
-            theta = 0.17;
+            theta = 0.12;
             robot->trajGen(step_count, t_step, alpha, t_double_support, COM_height, step_length, 
                            step_width, dt, theta, ankle_height, step_height, slope, offset, is_config);
             // trajSize_ = robot->OnlineDCMTrajGen(step_count, t_step, alpha, t_double_support, COM_height, step_length, 
@@ -993,6 +994,15 @@ void GaitManager::keyboardHandler(const std_msgs::Int32 &msg)
         case 117: // u: comming up
             init_com_pos[2] = COM_height;
             final_com_pos[2] = 0.71;
+            robot->generalTrajGen(dt, 2, init_com_pos, final_com_pos, init_com_orient, final_com_orient,
+                          init_lankle_pos, final_lankle_pos, init_lankle_orient, final_lankle_orient,
+                          init_rankle_pos, final_rankle_pos, init_rankle_orient, final_rankle_orient);
+            isKeyboardTrajectoryEnabled = false;
+            break;
+
+        case 106: // j: comming down
+            init_com_pos[2] = 0.71;
+            final_com_pos[2] = COM_height;
             robot->generalTrajGen(dt, 2, init_com_pos, final_com_pos, init_com_orient, final_com_orient,
                           init_lankle_pos, final_lankle_pos, init_lankle_orient, final_lankle_orient,
                           init_rankle_pos, final_rankle_pos, init_rankle_orient, final_rankle_orient);
