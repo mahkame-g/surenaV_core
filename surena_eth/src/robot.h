@@ -89,6 +89,7 @@ public slots:
     
 private:
     QList<int> _currentMotorPosition; // Store current motor positions
+    QList<int> _currentFingerMotorPosition; // Store current finger motor positions
     //=================================================================================================
     void Timeout();
     //=================================================================================================

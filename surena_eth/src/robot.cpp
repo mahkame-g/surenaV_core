@@ -36,6 +36,10 @@ Robot::Robot(QObject *parent, int argc, char **argv)
 
     _initialTimer.start(2000);
 
+    // Initialize finger motor positions with zeros
+    for(int i=0; i<34; i++)
+        _currentFingerMotorPosition.append(0);
+
     QLOG_TRACE()<<"Start initialize...";
 
 }
@@ -153,7 +157,7 @@ void Robot::NewjointDataReceived()
         _motorPosition.append(0);
     
     _currentMotorPosition = _motorPosition;
-    Epos4.SetAllPositionCST(_motorPosition);
+    Epos4.SetAllPositionCST(_currentMotorPosition, _currentFingerMotorPosition);
 }
 //=================================================================================================
 void Robot::NewFingerJointDataReceived()
@@ -165,10 +169,11 @@ void Robot::NewFingerJointDataReceived()
     {
         _fingerMotorPosition.append(_rosNode->FingerJointsData.data.at(i));
     }
-    for(int i=0; i<18-len ; i++)
+    for(int i=0; i<34-len ; i++)
         _fingerMotorPosition.append(0);
-
-    Epos4.SetAllPositionCST(_currentMotorPosition, _fingerMotorPosition);
+    
+    _currentFingerMotorPosition = _fingerMotorPosition;
+    Epos4.SetAllPositionCST(_currentMotorPosition, _currentFingerMotorPosition);
 }
 //=================================================================================================
 void  Robot::FeedBackReceived(QList<int16_t> ft, QList<int32_t> positions,QList<int32_t> positionsInc,QList<uint16_t> bump_sensor_list,QList<float> imu_data_list, float* pressureData)
@@ -378,7 +383,7 @@ void Robot::Timeout()
     {
         _motorPosition.append( pos);
     }
-    Epos4.SetAllPositionCST(_motorPosition);
+    Epos4.SetAllPositionCST(_motorPosition, _currentFingerMotorPosition);
 }
 //=================================================================================================
 void Robot::HommingLoop()
@@ -420,7 +425,7 @@ void Robot::HommingLoop()
     _motorPosition[22]=0;
     _motorPosition[23]=0;
     _motorPosition[24]=0;
-    Epos4.SetAllPositionCST(_motorPosition);
+    Epos4.SetAllPositionCST(_motorPosition, _currentFingerMotorPosition);
     //qDebug()<<"addad"<<_motorPosition.count();
 
 }

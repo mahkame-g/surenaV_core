@@ -604,7 +604,10 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
     */
 
     // QLOG_TRACE() << motorPositions[23] << " " << motorPositions[24] << " " << motorPositions[25];    
-    
+    // QLOG_TRACE() << fingerMotorPositions[0] << " " << fingerMotorPositions[1] << " " << fingerMotorPositions[2] << " " << fingerMotorPositions[3] << " " << fingerMotorPositions[4] << " " << fingerMotorPositions[5];
+    // QLOG_TRACE() << fingerMotorPositions[6] << " " << fingerMotorPositions[7] << " " << fingerMotorPositions[8] << " " << fingerMotorPositions[9] << " " << fingerMotorPositions[10] << " " << fingerMotorPositions[11];
+    // QLOG_TRACE() << fingerMotorPositions[12] << " " << fingerMotorPositions[13] << " " << fingerMotorPositions[14] << " " << fingerMotorPositions[15] << " " << fingerMotorPositions[16] << " " << fingerMotorPositions[17];
+
     if(palmID == 0) // wrist motors
     {
         command.append(0x02);
