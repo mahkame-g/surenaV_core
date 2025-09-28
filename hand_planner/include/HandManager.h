@@ -6,6 +6,7 @@
 #include "MinimumJerkInterpolation.h"
 #include "hand_motion_utils.h"
 #include "handwriting.h"
+#include "FingerControl.h"
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Core"
 #include <vector>
@@ -33,6 +34,9 @@
 #include "hand_planner/PickAndMove.h"
 #include "hand_planner/KeyboardJog.h"
 #include "hand_planner/MoveHandGeneral.h"
+#include "hand_planner/FingerControl.h"
+#include "hand_planner/FingerScenario.h"
+#include "hand_planner/MoveMotor.h"
 
 using namespace std;
 using namespace Eigen;
@@ -60,10 +64,16 @@ private:
     ros::ServiceServer move_hand_relative_service_;
     ros::ServiceServer move_hand_keyboard_service_;
     ros::ServiceServer move_hand_general_service_;
+    ros::ServiceServer finger_control_service_;
+    ros::ServiceServer finger_scenario_service_;
+    ros::ServiceServer move_finger_motor_service_;
 
     S5_hand hand_func_R;
     S5_hand hand_func_L;
     MinimumJerkInterpolation coef_generator;
+    
+    // Finger control
+    std::unique_ptr<FingerControl> finger_control_;
 
     VectorXd q_ra;
     VectorXd q_la;
@@ -123,6 +133,14 @@ private:
     bool move_hand_relative_handler(hand_planner::PickAndMove::Request &req, hand_planner::PickAndMove::Response &res);
     bool move_hand_keyboard_handler(hand_planner::KeyboardJog::Request &req, hand_planner::KeyboardJog::Response &res);
     bool move_hand_general_handler(hand_planner::MoveHandGeneral::Request &req, hand_planner::MoveHandGeneral::Response &res);
+    
+    // Finger control services
+    bool fingerControlService(hand_planner::FingerControl::Request &req, hand_planner::FingerControl::Response &res);
+    bool fingerScenarioService(hand_planner::FingerScenario::Request &req, hand_planner::FingerScenario::Response &res);
+    bool moveFingerMotorService(hand_planner::MoveMotor::Request &req, hand_planner::MoveMotor::Response &res);
+    
+    // Finger control access methods
+    FingerControl* getFingerControl() { return finger_control_.get(); }
 };
 
 #endif

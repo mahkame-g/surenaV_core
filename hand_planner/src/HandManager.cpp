@@ -44,6 +44,8 @@ HandManager::HandManager(ros::NodeHandle *n) :
     R_right_state_.setIdentity();
     right_state_init_ = true;
     
+    // Initialize finger control
+    finger_control_ = std::make_unique<FingerControl>(n);
 
     // ROS Communication Setup
     trajectory_data_pub = n->advertise<std_msgs::Int32MultiArray>("jointdata/qc", 100);
@@ -63,6 +65,11 @@ HandManager::HandManager(ros::NodeHandle *n) :
     move_hand_relative_service_  = n->advertiseService("move_hand_relative_srv",  &HandManager::move_hand_relative_handler, this);
     move_hand_keyboard_service_  = n->advertiseService("move_hand_keyboard_srv",  &HandManager::move_hand_keyboard_handler, this);
     move_hand_general_service_   = n->advertiseService("move_hand_general_srv",   &HandManager::move_hand_general_handler, this);
+    
+    // Finger control services
+    finger_control_service_ = n->advertiseService("finger_control_srv", &HandManager::fingerControlService, this);
+    finger_scenario_service_ = n->advertiseService("finger_scenario_srv", &HandManager::fingerScenarioService, this);
+    move_finger_motor_service_ = n->advertiseService("move_finger_motor_srv", &HandManager::moveFingerMotorService, this);
 }
 
 // --- Object Detection Callback Implementations ---
@@ -443,6 +450,7 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
 
     t_grip = 0;
     while (t_grip <= (120)) {
+        // if (t_grip >= 20.0) { global_finger_trigger = 1; }
         Vector3d target2camera(X, Y, Z);
         MatrixXd T_CAM2SH = hand_func_R.ObjToNeck(-h_pitch, h_roll, -h_yaw);
         Vector3d target2shoulder = T_CAM2SH.block(0, 3, 3, 1) + T_CAM2SH.block(0, 0, 3, 3) * target2camera;
@@ -856,6 +864,84 @@ bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Reque
     return true;
 }
 
+bool HandManager::fingerControlService(hand_planner::FingerControl::Request &req, hand_planner::FingerControl::Response &res) {
+    ROS_INFO("Received direct finger control request with hand selection: %s", req.hand_selection.c_str());
+    
+    try {
+        // Convert hand selection to enum (default to RIGHT_HAND if not specified)
+        HandSelection hand = (req.hand_selection.empty()) ? HandSelection::RIGHT_HAND : finger_control_->stringToHandSelection(req.hand_selection);
+        
+        // Convert request data to vectors
+        std::vector<uint8_t> positions(req.target_positions.begin(), req.target_positions.end());
+        std::vector<uint8_t> speeds(req.target_speeds.begin(), req.target_speeds.end());
+        std::vector<uint8_t> limits(req.pressure_limits.begin(), req.pressure_limits.end());
+        global_finger_trigger = 1;
+        
+        bool success = finger_control_->setDirectControl(positions, speeds, limits, req.pid_kp, req.pid_ki, req.pid_kd, hand);
+        
+        if (success) {
+            res.success = true;
+            res.message = "Direct finger control parameters set successfully";
+        } else {
+            res.success = false;
+            res.message = "Failed to set direct finger control parameters";
+        }
+        
+    } catch (const std::exception& e) {
+        res.success = false;
+        res.message = "Exception in direct finger control: " + std::string(e.what());
+    }
+    global_finger_trigger = 0;
+    return true;
+}
+
+bool HandManager::fingerScenarioService(hand_planner::FingerScenario::Request &req, hand_planner::FingerScenario::Response &res) {
+    ROS_INFO("Received finger scenario request for scenario: %s with hand selection: %s", req.scenario_name.c_str(), req.hand_selection.c_str());
+    
+    try {
+        // Convert hand selection to enum (default to RIGHT_HAND if not specified)
+        HandSelection hand = (req.hand_selection.empty()) ? HandSelection::RIGHT_HAND : finger_control_->stringToHandSelection(req.hand_selection);
+        global_finger_trigger = 1;
+        
+        if (finger_control_->executeScenario(req.scenario_name, hand)) {
+            res.success = true;
+            res.message = "Scenario executed successfully";
+        } else {
+            res.success = false;
+            res.message = "Failed to execute scenario";
+        }
+        
+    } catch (const std::exception& e) {
+        res.success = false;
+        res.message = "Exception in finger scenario: " + std::string(e.what());
+    }
+    global_finger_trigger = 0;
+    return true;
+}
+
+bool HandManager::moveFingerMotorService(hand_planner::MoveMotor::Request &req, hand_planner::MoveMotor::Response &res) {
+    ROS_INFO("Received move motor request: motor_id=%d, position=%d, speed=%d, hand_selection=%s", 
+             req.motor_id, req.position, req.speed, req.hand_selection.c_str());
+    
+    try {
+        // Convert hand selection to enum (default to RIGHT_HAND if not specified)
+        HandSelection hand = (req.hand_selection.empty()) ? HandSelection::RIGHT_HAND : finger_control_->stringToHandSelection(req.hand_selection);
+        
+        if (finger_control_->moveMotor(req.motor_id, req.position, req.speed, hand)) {
+            res.success = true;
+            res.message = "Motor movement command sent successfully";
+        } else {
+            res.success = false;
+            res.message = "Failed to send motor movement command";
+        }
+        
+    } catch (const std::exception& e) {
+        res.success = false;
+        res.message = "Exception in move motor: " + std::string(e.what());
+    }
+    
+    return true;
+}
 
 // // --- Main Function ---
 // int main(int argc, char **argv) {

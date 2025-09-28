@@ -70,6 +70,9 @@ add_service_files(
   PickAndMove.srv
   KeyboardJog.srv
   MoveHandGeneral.srv
+  FingerControl.srv
+  FingerScenario.srv
+  MoveMotor.srv
 )
 
 ## Generate added messages and services with any dependencies listed here
