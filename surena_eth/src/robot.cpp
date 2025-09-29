@@ -36,9 +36,11 @@ Robot::Robot(QObject *parent, int argc, char **argv)
 
     _initialTimer.start(2000);
 
-    // Initialize finger motor positions with zeros
-    for(int i=0; i<34; i++)
+    // Initialize all motor positions with zeros
+    for(int i=0; i<34; i++) {
         _currentFingerMotorPosition.append(0);
+        _currentMotorPosition.append(0);
+    }
 
     QLOG_TRACE()<<"Start initialize...";
 

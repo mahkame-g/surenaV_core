@@ -590,74 +590,203 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
     QByteArray command;
 
     static int palmID = 0;
-    
+    static int subPalmID0 = 0;
+    static int subPalmID1 = 0;
+    static int subPalmID2 = 0;
+
     /*
      * Finger Motor Data Structure:
-     * fingerMotorPositions[0-5]   : Right hand finger motors (Palm ID 1)
-     * fingerMotorPositions[6-11]  : Left hand finger motors (Palm ID 2)
-     * 
-     * Palm ID 0: Uses original motorPositions[23-28]
-     * Palm ID 1: Uses fingerMotorPositions[0-5] (right hand fingers)
-     * Palm ID 2: Uses fingerMotorPositions[6-11] (left hand fingers)
-     * 
-     * Each palm ID sends 6 motors with command ID and trigger
+     * fingerMotorPositions: 0-5: positions, 6-11: speeds, 12-17: pressure, 18-20: PID, 21-22: triggers
     */
 
     // QLOG_TRACE() << motorPositions[23] << " " << motorPositions[24] << " " << motorPositions[25];    
     // QLOG_TRACE() << fingerMotorPositions[0] << " " << fingerMotorPositions[1] << " " << fingerMotorPositions[2] << " " << fingerMotorPositions[3] << " " << fingerMotorPositions[4] << " " << fingerMotorPositions[5];
     // QLOG_TRACE() << fingerMotorPositions[6] << " " << fingerMotorPositions[7] << " " << fingerMotorPositions[8] << " " << fingerMotorPositions[9] << " " << fingerMotorPositions[10] << " " << fingerMotorPositions[11];
     // QLOG_TRACE() << fingerMotorPositions[12] << " " << fingerMotorPositions[13] << " " << fingerMotorPositions[14] << " " << fingerMotorPositions[15] << " " << fingerMotorPositions[16] << " " << fingerMotorPositions[17];
-
+    // QLOG_TRACE() << fingerMotorPositions[18] << " " << fingerMotorPositions[19] << " " << fingerMotorPositions[20];
+    // QLOG_TRACE() << fingerMotorPositions[21] << " " << fingerMotorPositions[22];
+    // QLOG_TRACE() << "palmID: " << palmID << " subPalmID0: " << subPalmID0 << " subPalmID1: " << subPalmID1 << " subPalmID2: " << subPalmID2;
+    
     if(palmID == 0) // wrist motors
     {
-        command.append(0x02);
-        command.append(0x81);
+        if(subPalmID0 == 0)
+        {
+            command.append(0x02);
+            command.append(0x81);
 
-        command.append(9);
+            command.append(9);
 
-        command.append(motorPositions[23]);
-        command.append(motorPositions[24]);
-        command.append(motorPositions[25]);
+            command.append(motorPositions[23]);
+            command.append(motorPositions[24]);
+            command.append(motorPositions[25]);
+            command.append((char)0);
+            command.append((char)0);
+            command.append((char)0);
 
-        command.append(motorPositions[26]);
-        command.append(motorPositions[27]);
-        command.append(motorPositions[28]);
+            command.append(1);
+            subPalmID0++;
+        }
+        else if(subPalmID0 == 1)
+        {
+            command.append(0x03);
+            command.append(0x51);
 
-        command.append(1);
+            command.append(9);
+
+            command.append(motorPositions[26]);
+            command.append(motorPositions[27]);
+            command.append(motorPositions[28]);
+            command.append((char)0);
+            command.append((char)0);
+            command.append((char)0);
+
+            command.append(1);
+            subPalmID0 = 0;
+        }
         palmID++;
-    } 
-    else if (palmID == 1) // Right hand
+    }
+    else if(palmID == 1) // right hand
     {
-        command.append(0x02);
-        command.append(0x81);
+        if(subPalmID1 == 0)
+        {
+            command.append(0x02);
+            command.append(0x81);
 
-        command.append(fingerMotorPositions[12]); // Command ID byte
+            command.append(1); // ID: 1 for speed data
 
-        command.append(fingerMotorPositions[0]); // INDEX_FINGER    
-        command.append(fingerMotorPositions[1]); // MIDDLE_FINGER
-        command.append(fingerMotorPositions[2]); // RING_FINGER
-        command.append(fingerMotorPositions[3]); // LITTLE_FINGER
-        command.append(fingerMotorPositions[4]); // THUMB_FINGER
-        command.append(fingerMotorPositions[5]); // THUMB2_FINGER
+            command.append(fingerMotorPositions[6]);  // INDEX_FINGER speed
+            command.append(fingerMotorPositions[7]);  // MIDDLE_FINGER speed
+            command.append(fingerMotorPositions[8]);  // RING_FINGER speed
+            command.append(fingerMotorPositions[9]);  // LITTLE_FINGER speed
+            command.append(fingerMotorPositions[10]); // THUMB_FINGER speed
+            command.append(fingerMotorPositions[11]); // THUMB2_FINGER speed
 
-        command.append(fingerMotorPositions[13]);  // Trigger byte
+            command.append(fingerMotorPositions[21]);  // Right hand trigger
+            subPalmID1++;
+        }
+        else if(subPalmID1 == 1)
+        {
+            command.append(0x02);
+            command.append(0x81);
+
+            command.append(2); // ID: 2 for pressure data
+
+            command.append(fingerMotorPositions[12]); // INDEX_FINGER pressure
+            command.append(fingerMotorPositions[13]); // MIDDLE_FINGER pressure
+            command.append(fingerMotorPositions[14]); // RING_FINGER pressure
+            command.append(fingerMotorPositions[15]); // LITTLE_FINGER pressure
+            command.append(fingerMotorPositions[16]); // THUMB_FINGER pressure
+            command.append(fingerMotorPositions[17]); // THUMB2_FINGER pressure
+
+            command.append(fingerMotorPositions[21]);  // Right hand trigger
+            subPalmID1++;
+        }
+        else if(subPalmID1 == 2)
+        {
+            command.append(0x02);
+            command.append(0x81);
+
+            command.append(3); // ID: 3 for PID data
+
+            command.append(fingerMotorPositions[18]); // PID parameter 1
+            command.append(fingerMotorPositions[19]); // PID parameter 2
+            command.append(fingerMotorPositions[20]); // PID parameter 3
+            command.append((char)0); // Zero padding
+            command.append((char)0); // Zero padding
+            command.append((char)0); // Zero padding
+
+            command.append(fingerMotorPositions[21]);  // Right hand trigger
+            subPalmID1++;
+        }
+        else if(subPalmID1 == 3)
+        {
+            command.append(0x02);
+            command.append(0x81);
+
+            command.append((char)0); // ID: 0 for position data
+
+            command.append(fingerMotorPositions[0]); // INDEX_FINGER position
+            command.append(fingerMotorPositions[1]); // MIDDLE_FINGER position
+            command.append(fingerMotorPositions[2]); // RING_FINGER position
+            command.append(fingerMotorPositions[3]); // LITTLE_FINGER position
+            command.append(fingerMotorPositions[4]); // THUMB_FINGER position
+            command.append(fingerMotorPositions[5]); // THUMB2_FINGER position
+
+            command.append(fingerMotorPositions[21]);  // Right hand trigger
+            subPalmID1 = 0;
+        }
         palmID++;
-    } 
-    else if (palmID == 2) // Left hand
+    }
+    else if(palmID == 2) // left hand
     {
-        command.append(0x02);
-        command.append(0x81);
+        if(subPalmID2 == 0)
+        {
+            command.append(0x03);
+            command.append(0x51);
 
-        command.append(fingerMotorPositions[14]); // Command ID byte
+            command.append(1); // ID: 1 for speed data
 
-        command.append(fingerMotorPositions[6]);  // INDEX_FINGER    
-        command.append(fingerMotorPositions[7]);  // MIDDLE_FINGER
-        command.append(fingerMotorPositions[8]);  // RING_FINGER
-        command.append(fingerMotorPositions[9]);  // LITTLE_FINGER
-        command.append(fingerMotorPositions[10]); // THUMB_FINGER
-        command.append(fingerMotorPositions[11]); // THUMB2_FINGER
+            command.append(fingerMotorPositions[6]);  // INDEX_FINGER speed
+            command.append(fingerMotorPositions[7]);  // MIDDLE_FINGER speed
+            command.append(fingerMotorPositions[8]);  // RING_FINGER speed
+            command.append(fingerMotorPositions[9]);  // LITTLE_FINGER speed
+            command.append(fingerMotorPositions[10]); // THUMB_FINGER speed
+            command.append(fingerMotorPositions[11]); // THUMB2_FINGER speed
 
-        command.append(fingerMotorPositions[15]);  // Trigger byte
+            command.append(fingerMotorPositions[22]);  // Left hand trigger
+            subPalmID2++;
+        }
+        else if(subPalmID2 == 1)
+        {
+            command.append(0x03);
+            command.append(0x51);
+
+            command.append(2); // ID: 2 for pressure data
+
+            command.append(fingerMotorPositions[12]); // INDEX_FINGER pressure
+            command.append(fingerMotorPositions[13]); // MIDDLE_FINGER pressure
+            command.append(fingerMotorPositions[14]); // RING_FINGER pressure
+            command.append(fingerMotorPositions[15]); // LITTLE_FINGER pressure
+            command.append(fingerMotorPositions[16]); // THUMB_FINGER pressure
+            command.append(fingerMotorPositions[17]); // THUMB2_FINGER pressure
+
+            command.append(fingerMotorPositions[22]);  // Left hand trigger
+            subPalmID2++;
+        }
+        else if(subPalmID2 == 2)
+        {
+            command.append(0x03);
+            command.append(0x51);
+
+            command.append(3); // ID: 3 for PID data
+
+            command.append(fingerMotorPositions[18]); // PID parameter 1
+            command.append(fingerMotorPositions[19]); // PID parameter 2
+            command.append(fingerMotorPositions[20]); // PID parameter 3
+            command.append((char)0); // Zero padding
+            command.append((char)0); // Zero padding
+            command.append((char)0); // Zero padding
+
+            command.append(fingerMotorPositions[22]);  // Left hand trigger
+            subPalmID2++;
+        }
+        else if(subPalmID2 == 3)
+        {
+            command.append(0x03);
+            command.append(0x51);
+
+            command.append((char)0); // ID: 0 for position data
+
+            command.append(fingerMotorPositions[0]); // INDEX_FINGER position
+            command.append(fingerMotorPositions[1]); // MIDDLE_FINGER position
+            command.append(fingerMotorPositions[2]); // RING_FINGER position
+            command.append(fingerMotorPositions[3]); // LITTLE_FINGER position
+            command.append(fingerMotorPositions[4]); // THUMB_FINGER position
+            command.append(fingerMotorPositions[5]); // THUMB2_FINGER position
+
+            command.append(fingerMotorPositions[22]);  // Left hand trigger
+            subPalmID2 = 0;
+        }
         palmID = 0;
     }
 

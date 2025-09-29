@@ -1,10 +1,10 @@
 # Request
-int8[] target_positions
-int8[] target_speeds
-int8[] pressure_limits
-int8 pid_kp
-int8 pid_ki
-int8 pid_kd
+int64[] target_positions
+int64[] target_speeds
+int64[] pressure_limits
+int64 pid_kp
+int64 pid_ki
+int64 pid_kd
 string hand_selection  # "right", "left", "both" (default="right")
 ---
 # Response
