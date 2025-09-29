@@ -873,6 +873,8 @@ void GaitManager::keyboardHandler(const std_msgs::Int32 &msg)
 
     int command = msg.data;
 
+    double com_z = robot->getCOMZ();
+
     // if (command == 101) // e
     // {
     //     trajSize_ = robot->changeStep();
@@ -992,7 +994,7 @@ void GaitManager::keyboardHandler(const std_msgs::Int32 &msg)
             break;
 
         case 117: // u: comming up
-            init_com_pos[2] = COM_height;
+            init_com_pos[2] = com_z;
             final_com_pos[2] = 0.71;
             robot->generalTrajGen(dt, 2, init_com_pos, final_com_pos, init_com_orient, final_com_orient,
                           init_lankle_pos, final_lankle_pos, init_lankle_orient, final_lankle_orient,
