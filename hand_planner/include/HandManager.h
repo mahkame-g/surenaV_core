@@ -54,7 +54,6 @@ private:
     ros::ServiceServer move_hand_single_service;
     ros::ServiceServer move_hand_both_service;
     ros::ServiceServer grip_online_service;
-    ros::ServiceServer home_service;
     ros::ServiceServer set_target_class_service;
     ros::ServiceServer head_track_service;
     ros::ServiceServer teleoperation_service;
@@ -130,7 +129,6 @@ private:
 
     bool single_hand(hand_planner::move_hand_single::Request &req, hand_planner::move_hand_single::Response &res);
     bool both_hands(hand_planner::move_hand_both::Request &req, hand_planner::move_hand_both::Response &res);
-    bool home(hand_planner::home_service::Request &req, hand_planner::home_service::Response &res);
     bool grip_online(hand_planner::gripOnline::Request &req, hand_planner::gripOnline::Response &res);
     bool setTargetClassService(hand_planner::SetTargetClass::Request &req, hand_planner::SetTargetClass::Response &res);
     bool head_track_handler(hand_planner::head_track::Request &req, hand_planner::head_track::Response &res);
