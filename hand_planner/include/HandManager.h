@@ -27,7 +27,6 @@
 #include "hand_planner/move_hand_single.h"
 #include "hand_planner/move_hand_both.h"
 #include "hand_planner/gripOnline.h"
-#include "hand_planner/home_service.h"
 #include "hand_planner/SetTargetClass.h"
 #include "hand_planner/head_track.h"
 #include "hand_planner/WriteString.h"

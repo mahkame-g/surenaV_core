@@ -312,7 +312,7 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
             trajectory_data.data.push_back(q_motor[i]); 
         }
         trajectory_data_pub.publish(trajectory_data);
-        cout << "robot_right" << ", " << q_motor[12] << ", " << q_motor[13] << ", " << q_motor[14] << ", " << q_motor[15] << ", " << q_motor[23] << ", " << q_motor[24] << ", " << q_motor[25] << endl;
+        // cout << "robot_right" << ", " << q_motor[12] << ", " << q_motor[13] << ", " << q_motor[14] << ", " << q_motor[15] << ", " << q_motor[23] << ", " << q_motor[24] << ", " << q_motor[25] << endl;
         // cout << "robot_left" << ", " << q_motor[16] << ", " << q_motor[17] << ", " << q_motor[18] << ", " << q_motor[19] << ", " << q_motor[26] << ", " << q_motor[27] << ", " << q_motor[28] << endl;
         last_q_motor = q_motor;
         
