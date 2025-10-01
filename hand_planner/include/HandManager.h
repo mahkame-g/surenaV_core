@@ -94,10 +94,17 @@ private:
     Eigen::VectorXd q_right_baseline_;
     Eigen::Matrix3d R_right_state_;
 
+    Eigen::VectorXd q_left_state_;
+    Eigen::VectorXd q_left_baseline_;
+    Eigen::Matrix3d R_left_state_;
+
+
     double T;
     int rate;
     bool simulation;
     bool right_state_init_;
+    bool left_state_init_;
+
     bool hand_keyboard_enabled_ =false;
     int encoderResolution[2];
     int harmonicRatio[4];
