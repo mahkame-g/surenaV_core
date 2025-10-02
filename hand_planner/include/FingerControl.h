@@ -32,7 +32,6 @@ enum class HandSelection {
 struct FingerScenario {
     std::string name;
     std::vector<uint8_t> target_positions;   // 0-255
-    std::vector<uint8_t> target_speeds;      // 0-255
     std::vector<uint8_t> pressure_limits;    // 0-255
     uint8_t pid_kp;                          // Single value (0-255)
     uint8_t pid_ki;                          // Single value (0-255)
@@ -40,7 +39,6 @@ struct FingerScenario {
     
     FingerScenario() : pid_kp(10), pid_ki(0), pid_kd(0) {
         target_positions.resize(6, 0);
-        target_speeds.resize(6, 0);
         pressure_limits.resize(6, 0);
     }
 };
@@ -54,13 +52,12 @@ public:
     
     // Direct control
     bool setDirectControl(const std::vector<uint8_t>& positions,
-                         const std::vector<uint8_t>& speeds,
                          const std::vector<uint8_t>& limits,
                          uint8_t kp, uint8_t ki, uint8_t kd,
                          HandSelection hand = HandSelection::RIGHT_HAND);
     
     // Individual motor control
-    bool moveMotor(uint8_t motor_id, uint8_t position, uint8_t speed, HandSelection hand = HandSelection::RIGHT_HAND);
+    bool moveMotor(uint8_t motor_id, uint8_t position, HandSelection hand = HandSelection::RIGHT_HAND);
     
     // Utility method to convert string to HandSelection
     static HandSelection stringToHandSelection(const std::string& hand_str);

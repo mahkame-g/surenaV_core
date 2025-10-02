@@ -450,7 +450,6 @@ bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_plann
 
     t_grip = 0;
     while (t_grip <= (120)) {
-        // if (t_grip >= 20.0) { global_finger_trigger = 1; }
         Vector3d target2camera(X, Y, Z);
         MatrixXd T_CAM2SH = hand_func_R.ObjToNeck(-h_pitch, h_roll, -h_yaw);
         Vector3d target2shoulder = T_CAM2SH.block(0, 3, 3, 1) + T_CAM2SH.block(0, 0, 3, 3) * target2camera;
@@ -873,11 +872,10 @@ bool HandManager::fingerControlService(hand_planner::FingerControl::Request &req
         
         // Convert request data to vectors
         std::vector<uint8_t> positions(req.target_positions.begin(), req.target_positions.end());
-        std::vector<uint8_t> speeds(req.target_speeds.begin(), req.target_speeds.end());
         std::vector<uint8_t> limits(req.pressure_limits.begin(), req.pressure_limits.end());
         global_finger_trigger = 1;
         
-        bool success = finger_control_->setDirectControl(positions, speeds, limits, req.pid_kp, req.pid_ki, req.pid_kd, hand);
+        bool success = finger_control_->setDirectControl(positions, limits, req.pid_kp, req.pid_ki, req.pid_kd, hand);
         
         if (success) {
             res.success = true;
@@ -920,14 +918,15 @@ bool HandManager::fingerScenarioService(hand_planner::FingerScenario::Request &r
 }
 
 bool HandManager::moveFingerMotorService(hand_planner::MoveMotor::Request &req, hand_planner::MoveMotor::Response &res) {
-    ROS_INFO("Received move motor request: motor_id=%d, position=%d, speed=%d, hand_selection=%s", 
-             req.motor_id, req.position, req.speed, req.hand_selection.c_str());
+    ROS_INFO("Received move motor request: motor_id=%d, position=%d, hand_selection=%s", 
+             req.motor_id, req.position, req.hand_selection.c_str());
     
     try {
         // Convert hand selection to enum (default to RIGHT_HAND if not specified)
         HandSelection hand = (req.hand_selection.empty()) ? HandSelection::RIGHT_HAND : finger_control_->stringToHandSelection(req.hand_selection);
+        global_finger_trigger = 1;
         
-        if (finger_control_->moveMotor(req.motor_id, req.position, req.speed, hand)) {
+        if (finger_control_->moveMotor(req.motor_id, req.position, hand)) {
             res.success = true;
             res.message = "Motor movement command sent successfully";
         } else {
@@ -939,7 +938,7 @@ bool HandManager::moveFingerMotorService(hand_planner::MoveMotor::Request &req, 
         res.success = false;
         res.message = "Exception in move motor: " + std::string(e.what());
     }
-    
+    global_finger_trigger = 0;
     return true;
 }
 

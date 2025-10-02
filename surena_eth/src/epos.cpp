@@ -602,9 +602,8 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
     // QLOG_TRACE() << motorPositions[23] << " " << motorPositions[24] << " " << motorPositions[25];    
     // QLOG_TRACE() << fingerMotorPositions[0] << " " << fingerMotorPositions[1] << " " << fingerMotorPositions[2] << " " << fingerMotorPositions[3] << " " << fingerMotorPositions[4] << " " << fingerMotorPositions[5];
     // QLOG_TRACE() << fingerMotorPositions[6] << " " << fingerMotorPositions[7] << " " << fingerMotorPositions[8] << " " << fingerMotorPositions[9] << " " << fingerMotorPositions[10] << " " << fingerMotorPositions[11];
-    // QLOG_TRACE() << fingerMotorPositions[12] << " " << fingerMotorPositions[13] << " " << fingerMotorPositions[14] << " " << fingerMotorPositions[15] << " " << fingerMotorPositions[16] << " " << fingerMotorPositions[17];
-    // QLOG_TRACE() << fingerMotorPositions[18] << " " << fingerMotorPositions[19] << " " << fingerMotorPositions[20];
-    // QLOG_TRACE() << fingerMotorPositions[21] << " " << fingerMotorPositions[22];
+    // QLOG_TRACE() << fingerMotorPositions[12] << " " << fingerMotorPositions[13] << " " << fingerMotorPositions[14];
+    // QLOG_TRACE() << fingerMotorPositions[15] << " " << fingerMotorPositions[16];
     // QLOG_TRACE() << "palmID: " << palmID << " subPalmID0: " << subPalmID0 << " subPalmID1: " << subPalmID1 << " subPalmID2: " << subPalmID2;
     
     if(palmID == 0) // wrist motors
@@ -614,7 +613,7 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
             command.append(0x02);
             command.append(0x81);
 
-            command.append(9);
+            command.append(6); // ID: 6 for set servo position
 
             command.append(motorPositions[23]);
             command.append(motorPositions[24]);
@@ -628,10 +627,10 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
         }
         else if(subPalmID0 == 1)
         {
-            command.append(0x03);
-            command.append(0x51);
+            command.append(0x02);
+            command.append(0x82);
 
-            command.append(9);
+            command.append(6); // ID: 6 for set servo position
 
             command.append(motorPositions[26]);
             command.append(motorPositions[27]);
@@ -652,7 +651,7 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
             command.append(0x02);
             command.append(0x81);
 
-            command.append(1); // ID: 1 for speed data
+            command.append(11); // ID: 11 for pressure data
 
             command.append(fingerMotorPositions[6]);  // INDEX_FINGER speed
             command.append(fingerMotorPositions[7]);  // MIDDLE_FINGER speed
@@ -661,7 +660,7 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
             command.append(fingerMotorPositions[10]); // THUMB_FINGER speed
             command.append(fingerMotorPositions[11]); // THUMB2_FINGER speed
 
-            command.append(fingerMotorPositions[21]);  // Right hand trigger
+            command.append(fingerMotorPositions[15]);  // Right hand trigger
             subPalmID1++;
         }
         else if(subPalmID1 == 1)
@@ -669,16 +668,16 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
             command.append(0x02);
             command.append(0x81);
 
-            command.append(2); // ID: 2 for pressure data
+            command.append(12); // ID: 12 for PID data
 
-            command.append(fingerMotorPositions[12]); // INDEX_FINGER pressure
-            command.append(fingerMotorPositions[13]); // MIDDLE_FINGER pressure
-            command.append(fingerMotorPositions[14]); // RING_FINGER pressure
-            command.append(fingerMotorPositions[15]); // LITTLE_FINGER pressure
-            command.append(fingerMotorPositions[16]); // THUMB_FINGER pressure
-            command.append(fingerMotorPositions[17]); // THUMB2_FINGER pressure
+            command.append(fingerMotorPositions[12]); // PID parameter 1
+            command.append(fingerMotorPositions[13]); // PID parameter 2
+            command.append(fingerMotorPositions[14]); // PID parameter 3
+            command.append((char)0); // Zero padding
+            command.append((char)0); // Zero padding
+            command.append((char)0); // Zero padding
 
-            command.append(fingerMotorPositions[21]);  // Right hand trigger
+            command.append(fingerMotorPositions[15]);  // Right hand trigger
             subPalmID1++;
         }
         else if(subPalmID1 == 2)
@@ -686,24 +685,7 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
             command.append(0x02);
             command.append(0x81);
 
-            command.append(3); // ID: 3 for PID data
-
-            command.append(fingerMotorPositions[18]); // PID parameter 1
-            command.append(fingerMotorPositions[19]); // PID parameter 2
-            command.append(fingerMotorPositions[20]); // PID parameter 3
-            command.append((char)0); // Zero padding
-            command.append((char)0); // Zero padding
-            command.append((char)0); // Zero padding
-
-            command.append(fingerMotorPositions[21]);  // Right hand trigger
-            subPalmID1++;
-        }
-        else if(subPalmID1 == 3)
-        {
-            command.append(0x02);
-            command.append(0x81);
-
-            command.append((char)0); // ID: 0 for position data
+            command.append(10); // ID: 10 for position data
 
             command.append(fingerMotorPositions[0]); // INDEX_FINGER position
             command.append(fingerMotorPositions[1]); // MIDDLE_FINGER position
@@ -712,7 +694,7 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
             command.append(fingerMotorPositions[4]); // THUMB_FINGER position
             command.append(fingerMotorPositions[5]); // THUMB2_FINGER position
 
-            command.append(fingerMotorPositions[21]);  // Right hand trigger
+            command.append(fingerMotorPositions[15]);  // Right hand trigger
             subPalmID1 = 0;
         }
         palmID++;
@@ -721,10 +703,10 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
     {
         if(subPalmID2 == 0)
         {
-            command.append(0x03);
-            command.append(0x51);
+            command.append(0x02);
+            command.append(0x82);
 
-            command.append(1); // ID: 1 for speed data
+            command.append(11); // ID: 11 for pressure data
 
             command.append(fingerMotorPositions[6]);  // INDEX_FINGER speed
             command.append(fingerMotorPositions[7]);  // MIDDLE_FINGER speed
@@ -733,49 +715,32 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
             command.append(fingerMotorPositions[10]); // THUMB_FINGER speed
             command.append(fingerMotorPositions[11]); // THUMB2_FINGER speed
 
-            command.append(fingerMotorPositions[22]);  // Left hand trigger
+            command.append(fingerMotorPositions[16]);  // Left hand trigger
             subPalmID2++;
         }
         else if(subPalmID2 == 1)
         {
-            command.append(0x03);
-            command.append(0x51);
+            command.append(0x02);
+            command.append(0x82);
 
-            command.append(2); // ID: 2 for pressure data
+            command.append(12); // ID: 12 for PID data
 
-            command.append(fingerMotorPositions[12]); // INDEX_FINGER pressure
-            command.append(fingerMotorPositions[13]); // MIDDLE_FINGER pressure
-            command.append(fingerMotorPositions[14]); // RING_FINGER pressure
-            command.append(fingerMotorPositions[15]); // LITTLE_FINGER pressure
-            command.append(fingerMotorPositions[16]); // THUMB_FINGER pressure
-            command.append(fingerMotorPositions[17]); // THUMB2_FINGER pressure
+            command.append(fingerMotorPositions[12]); // PID parameter 1
+            command.append(fingerMotorPositions[13]); // PID parameter 2
+            command.append(fingerMotorPositions[14]); // PID parameter 3
+            command.append((char)0); // Zero padding
+            command.append((char)0); // Zero padding
+            command.append((char)0); // Zero padding
 
-            command.append(fingerMotorPositions[22]);  // Left hand trigger
+            command.append(fingerMotorPositions[16]);  // Left hand trigger
             subPalmID2++;
         }
         else if(subPalmID2 == 2)
         {
-            command.append(0x03);
-            command.append(0x51);
+            command.append(0x02);
+            command.append(0x82);
 
-            command.append(3); // ID: 3 for PID data
-
-            command.append(fingerMotorPositions[18]); // PID parameter 1
-            command.append(fingerMotorPositions[19]); // PID parameter 2
-            command.append(fingerMotorPositions[20]); // PID parameter 3
-            command.append((char)0); // Zero padding
-            command.append((char)0); // Zero padding
-            command.append((char)0); // Zero padding
-
-            command.append(fingerMotorPositions[22]);  // Left hand trigger
-            subPalmID2++;
-        }
-        else if(subPalmID2 == 3)
-        {
-            command.append(0x03);
-            command.append(0x51);
-
-            command.append((char)0); // ID: 0 for position data
+            command.append(10); // ID: 10 for position data
 
             command.append(fingerMotorPositions[0]); // INDEX_FINGER position
             command.append(fingerMotorPositions[1]); // MIDDLE_FINGER position
@@ -784,7 +749,7 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
             command.append(fingerMotorPositions[4]); // THUMB_FINGER position
             command.append(fingerMotorPositions[5]); // THUMB2_FINGER position
 
-            command.append(fingerMotorPositions[22]);  // Left hand trigger
+            command.append(fingerMotorPositions[16]);  // Left hand trigger
             subPalmID2 = 0;
         }
         palmID = 0;

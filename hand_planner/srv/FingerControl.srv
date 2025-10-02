@@ -1,6 +1,5 @@
 # Request
 int64[] target_positions
-int64[] target_speeds
 int64[] pressure_limits
 int64 pid_kp
 int64 pid_ki

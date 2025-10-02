@@ -1,7 +1,6 @@
 # Request
 int8 motor_id
 int8 position
-int8 speed
 string hand_selection  # "right", "left", "both" (default="right")
 ---
 # Response
