@@ -585,7 +585,7 @@ inline QByteArray Epos::CreateServoHeadCommand(QList<int> motorPositions)
     return command;
 }
 //========================================================================
-inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> fingerMotorPositions)
+inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions)
 {
     QByteArray command;
 
@@ -594,16 +594,22 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
     static int subPalmID1 = 0;
     static int subPalmID2 = 0;
 
-    /*
-     * Finger Motor Data Structure:
-     * fingerMotorPositions: 0-5: positions, 6-11: speeds, 12-17: pressure, 18-20: PID, 21-22: triggers
-    */
+    // Finger Motor Data Structure: 29 + (0-5: positions, 6-11: pressure, 12-14: PID, 15-16: triggers)
+   
+    // QLOG_TRACE() << motorPositions[0] << " " << motorPositions[1] << " " << motorPositions[2] << " " << motorPositions[3] << " " << motorPositions[4] << " " << motorPositions[5];
+    // QLOG_TRACE() << motorPositions[6] << " " << motorPositions[7] << " " << motorPositions[8] << " " << motorPositions[9] << " " << motorPositions[10] << " " << motorPositions[11];
+    // QLOG_TRACE() << motorPositions[12] << " " << motorPositions[13] << " " << motorPositions[14] << " " << motorPositions[15];
+    // QLOG_TRACE() << motorPositions[16] << " " << motorPositions[17] << " " << motorPositions[18] << " " << motorPositions[19];
+    // QLOG_TRACE() << motorPositions[20] << " " << motorPositions[21] << " " << motorPositions[22];
+    // QLOG_TRACE() << motorPositions[23] << " " << motorPositions[24] << " " << motorPositions[25];
+    // QLOG_TRACE() << motorPositions[26] << " " << motorPositions[27] << " " << motorPositions[28];
+    // QLOG_TRACE() << motorPositions[29+0] << " " << motorPositions[29+1] << " " << motorPositions[29+2] << " " << motorPositions[29+3] << " " << motorPositions[29+4] << " " << motorPositions[29+5];
+    // QLOG_TRACE() << motorPositions[29+6] << " " << motorPositions[29+7] << " " << motorPositions[29+8] << " " << motorPositions[29+9] << " " << motorPositions[29+10] << " " << motorPositions[29+11];
+    // QLOG_TRACE() << motorPositions[29+12] << " " << motorPositions[29+13] << " " << motorPositions[29+14];
+    // QLOG_TRACE() << motorPositions[29+15] << " " << motorPositions[29+16];
 
-    // QLOG_TRACE() << motorPositions[23] << " " << motorPositions[24] << " " << motorPositions[25];    
-    // QLOG_TRACE() << fingerMotorPositions[0] << " " << fingerMotorPositions[1] << " " << fingerMotorPositions[2] << " " << fingerMotorPositions[3] << " " << fingerMotorPositions[4] << " " << fingerMotorPositions[5];
-    // QLOG_TRACE() << fingerMotorPositions[6] << " " << fingerMotorPositions[7] << " " << fingerMotorPositions[8] << " " << fingerMotorPositions[9] << " " << fingerMotorPositions[10] << " " << fingerMotorPositions[11];
-    // QLOG_TRACE() << fingerMotorPositions[12] << " " << fingerMotorPositions[13] << " " << fingerMotorPositions[14];
-    // QLOG_TRACE() << fingerMotorPositions[15] << " " << fingerMotorPositions[16];
+
+
     // QLOG_TRACE() << "palmID: " << palmID << " subPalmID0: " << subPalmID0 << " subPalmID1: " << subPalmID1 << " subPalmID2: " << subPalmID2;
     
     if(palmID == 0) // wrist motors
@@ -653,14 +659,14 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
 
             command.append(11); // ID: 11 for pressure data
 
-            command.append(fingerMotorPositions[6]);  // INDEX_FINGER speed
-            command.append(fingerMotorPositions[7]);  // MIDDLE_FINGER speed
-            command.append(fingerMotorPositions[8]);  // RING_FINGER speed
-            command.append(fingerMotorPositions[9]);  // LITTLE_FINGER speed
-            command.append(fingerMotorPositions[10]); // THUMB_FINGER speed
-            command.append(fingerMotorPositions[11]); // THUMB2_FINGER speed
+            command.append(motorPositions[6+29]);  // INDEX_FINGER speed
+            command.append(motorPositions[7+29]);  // MIDDLE_FINGER speed
+            command.append(motorPositions[8+29]);  // RING_FINGER speed
+            command.append(motorPositions[9+29]);  // LITTLE_FINGER speed
+            command.append(motorPositions[10+29]); // THUMB_FINGER speed
+            command.append(motorPositions[11+29]); // THUMB2_FINGER speed
 
-            command.append(fingerMotorPositions[15]);  // Right hand trigger
+            command.append(motorPositions[15+29]);  // Right hand trigger
             subPalmID1++;
         }
         else if(subPalmID1 == 1)
@@ -670,14 +676,14 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
 
             command.append(12); // ID: 12 for PID data
 
-            command.append(fingerMotorPositions[12]); // PID parameter 1
-            command.append(fingerMotorPositions[13]); // PID parameter 2
-            command.append(fingerMotorPositions[14]); // PID parameter 3
+            command.append(motorPositions[12+29]); // PID parameter 1
+            command.append(motorPositions[13+29]); // PID parameter 2
+            command.append(motorPositions[14+29]); // PID parameter 3
             command.append((char)0); // Zero padding
             command.append((char)0); // Zero padding
             command.append((char)0); // Zero padding
 
-            command.append(fingerMotorPositions[15]);  // Right hand trigger
+            command.append(motorPositions[15+29]);  // Right hand trigger
             subPalmID1++;
         }
         else if(subPalmID1 == 2)
@@ -687,14 +693,14 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
 
             command.append(10); // ID: 10 for position data
 
-            command.append(fingerMotorPositions[0]); // INDEX_FINGER position
-            command.append(fingerMotorPositions[1]); // MIDDLE_FINGER position
-            command.append(fingerMotorPositions[2]); // RING_FINGER position
-            command.append(fingerMotorPositions[3]); // LITTLE_FINGER position
-            command.append(fingerMotorPositions[4]); // THUMB_FINGER position
-            command.append(fingerMotorPositions[5]); // THUMB2_FINGER position
+            command.append(motorPositions[0+29]); // INDEX_FINGER position
+            command.append(motorPositions[1+29]); // MIDDLE_FINGER position
+            command.append(motorPositions[2+29]); // RING_FINGER position
+            command.append(motorPositions[3+29]); // LITTLE_FINGER position
+            command.append(motorPositions[4+29]); // THUMB_FINGER position
+            command.append(motorPositions[5+29]); // THUMB2_FINGER position
 
-            command.append(fingerMotorPositions[15]);  // Right hand trigger
+            command.append(motorPositions[15+29]);  // Right hand trigger
             subPalmID1 = 0;
         }
         palmID++;
@@ -708,14 +714,14 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
 
             command.append(11); // ID: 11 for pressure data
 
-            command.append(fingerMotorPositions[6]);  // INDEX_FINGER speed
-            command.append(fingerMotorPositions[7]);  // MIDDLE_FINGER speed
-            command.append(fingerMotorPositions[8]);  // RING_FINGER speed
-            command.append(fingerMotorPositions[9]);  // LITTLE_FINGER speed
-            command.append(fingerMotorPositions[10]); // THUMB_FINGER speed
-            command.append(fingerMotorPositions[11]); // THUMB2_FINGER speed
+            command.append(motorPositions[6+29]);  // INDEX_FINGER speed
+            command.append(motorPositions[7+29]);  // MIDDLE_FINGER speed
+            command.append(motorPositions[8+29]);  // RING_FINGER speed
+            command.append(motorPositions[9+29]);  // LITTLE_FINGER speed
+            command.append(motorPositions[10+29]); // THUMB_FINGER speed
+            command.append(motorPositions[11+29]); // THUMB2_FINGER speed
 
-            command.append(fingerMotorPositions[16]);  // Left hand trigger
+            command.append(motorPositions[16+29]);  // Left hand trigger
             subPalmID2++;
         }
         else if(subPalmID2 == 1)
@@ -725,14 +731,14 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
 
             command.append(12); // ID: 12 for PID data
 
-            command.append(fingerMotorPositions[12]); // PID parameter 1
-            command.append(fingerMotorPositions[13]); // PID parameter 2
-            command.append(fingerMotorPositions[14]); // PID parameter 3
+            command.append(motorPositions[12+29]); // PID parameter 1
+            command.append(motorPositions[13+29]); // PID parameter 2
+            command.append(motorPositions[14+29]); // PID parameter 3
             command.append((char)0); // Zero padding
             command.append((char)0); // Zero padding
             command.append((char)0); // Zero padding
 
-            command.append(fingerMotorPositions[16]);  // Left hand trigger
+            command.append(motorPositions[16+29]);  // Left hand trigger
             subPalmID2++;
         }
         else if(subPalmID2 == 2)
@@ -742,14 +748,14 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
 
             command.append(10); // ID: 10 for position data
 
-            command.append(fingerMotorPositions[0]); // INDEX_FINGER position
-            command.append(fingerMotorPositions[1]); // MIDDLE_FINGER position
-            command.append(fingerMotorPositions[2]); // RING_FINGER position
-            command.append(fingerMotorPositions[3]); // LITTLE_FINGER position
-            command.append(fingerMotorPositions[4]); // THUMB_FINGER position
-            command.append(fingerMotorPositions[5]); // THUMB2_FINGER position
+            command.append(motorPositions[0+29]); // INDEX_FINGER position
+            command.append(motorPositions[1+29]); // MIDDLE_FINGER position
+            command.append(motorPositions[2+29]); // RING_FINGER position
+            command.append(motorPositions[3+29]); // LITTLE_FINGER position
+            command.append(motorPositions[4+29]); // THUMB_FINGER position
+            command.append(motorPositions[5+29]); // THUMB2_FINGER position
 
-            command.append(fingerMotorPositions[16]);  // Left hand trigger
+            command.append(motorPositions[16+29]);  // Left hand trigger
             subPalmID2 = 0;
         }
         palmID = 0;
@@ -758,14 +764,14 @@ inline QByteArray Epos::CreatePalmCommand(QList<int> motorPositions, QList<int> 
     return command;
 }
 //========================================================================
-void Epos::SetAllPositionCST(QList<int> motorPositions, QList<int> fingerMotorPositions)
+void Epos::SetAllPositionCST(QList<int> motorPositions)
 {
 
     QByteArray command;
     for(int i=0; i< 12; i++)
         command.append(MotorDataToArray(0x401,motorPositions.at(i)));
     command.append(CreateHandPacket(motorPositions));
-    command.append(CreatePalmCommand(motorPositions, fingerMotorPositions));
+    command.append(CreatePalmCommand(motorPositions));
     command.append(CreateServoHeadCommand(motorPositions));
     //    //packet must be 300 bytes 180 byte zero
     command.append(QByteArray(ReserveByteCount, Qt::Initialization::Uninitialized));

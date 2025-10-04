@@ -1,8 +1,0 @@
-# Request
-int8 motor_id
-int8 position
-string hand_selection  # "right", "left", "both" (default="right")
----
-# Response
-bool success
-string message

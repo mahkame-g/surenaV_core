@@ -36,7 +36,6 @@
 #include "hand_planner/MoveHandGeneral.h"
 #include "hand_planner/FingerControl.h"
 #include "hand_planner/FingerScenario.h"
-#include "hand_planner/MoveMotor.h"
 
 using namespace std;
 using namespace Eigen;
@@ -66,7 +65,6 @@ private:
     ros::ServiceServer move_hand_general_service_;
     ros::ServiceServer finger_control_service_;
     ros::ServiceServer finger_scenario_service_;
-    ros::ServiceServer move_finger_motor_service_;
 
     S5_hand hand_func_R;
     S5_hand hand_func_L;
@@ -137,8 +135,7 @@ private:
     // Finger control services
     bool fingerControlService(hand_planner::FingerControl::Request &req, hand_planner::FingerControl::Response &res);
     bool fingerScenarioService(hand_planner::FingerScenario::Request &req, hand_planner::FingerScenario::Response &res);
-    bool moveFingerMotorService(hand_planner::MoveMotor::Request &req, hand_planner::MoveMotor::Response &res);
-    
+
     // Finger control access methods
     FingerControl* getFingerControl() { return finger_control_.get(); }
 };

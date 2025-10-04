@@ -69,7 +69,6 @@ HandManager::HandManager(ros::NodeHandle *n) :
     // Finger control services
     finger_control_service_ = n->advertiseService("finger_control_srv", &HandManager::fingerControlService, this);
     finger_scenario_service_ = n->advertiseService("finger_scenario_srv", &HandManager::fingerScenarioService, this);
-    move_finger_motor_service_ = n->advertiseService("move_finger_motor_srv", &HandManager::moveFingerMotorService, this);
 }
 
 // --- Object Detection Callback Implementations ---
@@ -917,30 +916,6 @@ bool HandManager::fingerScenarioService(hand_planner::FingerScenario::Request &r
     return true;
 }
 
-bool HandManager::moveFingerMotorService(hand_planner::MoveMotor::Request &req, hand_planner::MoveMotor::Response &res) {
-    ROS_INFO("Received move motor request: motor_id=%d, position=%d, hand_selection=%s", 
-             req.motor_id, req.position, req.hand_selection.c_str());
-    
-    try {
-        // Convert hand selection to enum (default to RIGHT_HAND if not specified)
-        HandSelection hand = (req.hand_selection.empty()) ? HandSelection::RIGHT_HAND : finger_control_->stringToHandSelection(req.hand_selection);
-        global_finger_trigger = 1;
-        
-        if (finger_control_->moveMotor(req.motor_id, req.position, hand)) {
-            res.success = true;
-            res.message = "Motor movement command sent successfully";
-        } else {
-            res.success = false;
-            res.message = "Failed to send motor movement command";
-        }
-        
-    } catch (const std::exception& e) {
-        res.success = false;
-        res.message = "Exception in move motor: " + std::string(e.what());
-    }
-    global_finger_trigger = 0;
-    return true;
-}
 
 // // --- Main Function ---
 // int main(int argc, char **argv) {

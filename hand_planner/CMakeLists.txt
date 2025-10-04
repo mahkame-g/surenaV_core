@@ -72,7 +72,6 @@ add_service_files(
   MoveHandGeneral.srv
   FingerControl.srv
   FingerScenario.srv
-  MoveMotor.srv
 )
 
 ## Generate added messages and services with any dependencies listed here

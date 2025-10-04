@@ -19,7 +19,6 @@ Robot::Robot(QObject *parent, int argc, char **argv)
     pos=0;
     connect(_rosNode,SIGNAL(rosShutdown()),this,SLOT(CleanAndExit()));
     connect(_rosNode,SIGNAL(NewjointDataReceived()),this,SLOT(NewjointDataReceived()));
-    connect(_rosNode,SIGNAL(NewFingerJointDataReceived()),this,SLOT(NewFingerJointDataReceived()));
     connect(_rosNode,SIGNAL(SetActiveCSP(int)),this,SLOT(ActiveCSP(int)));
     connect(_rosNode,SIGNAL(DoResetAllNodes(int)),this,SLOT(ResetAllNodes(int)));
     connect(_rosNode,SIGNAL(DoResetLegs()),this,SLOT(ResetLegs()));
@@ -35,12 +34,6 @@ Robot::Robot(QObject *parent, int argc, char **argv)
 
 
     _initialTimer.start(2000);
-
-    // Initialize all motor positions with zeros
-    for(int i=0; i<34; i++) {
-        _currentFingerMotorPosition.append(0);
-        _currentMotorPosition.append(0);
-    }
 
     QLOG_TRACE()<<"Start initialize...";
 
@@ -155,27 +148,11 @@ void Robot::NewjointDataReceived()
     {
         _motorPosition.append(_rosNode->JointsData.data.at(i));
     }
-    for(int i=0; i<34-len ; i++)
+    for(int i=0; i<50-len ; i++)
         _motorPosition.append(0);
     
-    _currentMotorPosition = _motorPosition;
-    Epos4.SetAllPositionCST(_currentMotorPosition, _currentFingerMotorPosition);
-}
-//=================================================================================================
-void Robot::NewFingerJointDataReceived()
-{
-    //  qDebug()<<"get new finger data..."<<_rosNode->FingerJointsData.data.at(0);
-    QList<int> _fingerMotorPosition;
-    int len=_rosNode->FingerJointsData.data.size() ;
-    for(int i=0; i<len ; i++)
-    {
-        _fingerMotorPosition.append(_rosNode->FingerJointsData.data.at(i));
-    }
-    for(int i=0; i<34-len ; i++)
-        _fingerMotorPosition.append(0);
     
-    _currentFingerMotorPosition = _fingerMotorPosition;
-    Epos4.SetAllPositionCST(_currentMotorPosition, _currentFingerMotorPosition);
+    Epos4.SetAllPositionCST(_motorPosition);
 }
 //=================================================================================================
 void  Robot::FeedBackReceived(QList<int16_t> ft, QList<int32_t> positions,QList<int32_t> positionsInc,QList<uint16_t> bump_sensor_list,QList<float> imu_data_list, float* pressureData)
@@ -385,7 +362,7 @@ void Robot::Timeout()
     {
         _motorPosition.append( pos);
     }
-    Epos4.SetAllPositionCST(_motorPosition, _currentFingerMotorPosition);
+    Epos4.SetAllPositionCST(_motorPosition);
 }
 //=================================================================================================
 void Robot::HommingLoop()
@@ -427,7 +404,7 @@ void Robot::HommingLoop()
     _motorPosition[22]=0;
     _motorPosition[23]=0;
     _motorPosition[24]=0;
-    Epos4.SetAllPositionCST(_motorPosition, _currentFingerMotorPosition);
+    Epos4.SetAllPositionCST(_motorPosition);
     //qDebug()<<"addad"<<_motorPosition.count();
 
 }
