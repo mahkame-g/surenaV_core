@@ -63,7 +63,6 @@ add_service_files(
   move_hand_single.srv
   move_hand_both.srv
   gripOnline.srv
-  home_service.srv
   SetTargetClass.srv
   head_track.srv
   WriteString.srv
@@ -72,6 +71,7 @@ add_service_files(
   MoveHandGeneral.srv
   FingerControl.srv
   FingerScenario.srv
+  arm_back_to_home.srv
 )
 
 ## Generate added messages and services with any dependencies listed here

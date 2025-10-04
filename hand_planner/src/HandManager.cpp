@@ -38,7 +38,10 @@ HandManager::HandManager(ros::NodeHandle *n) :
     q_rad_teleop.resize(14);
     q_rad_teleop.setZero();
 
-    // initial position
+    last_q_gazebo.resize(29, 0.0);
+    last_q_motor.resize(29, 0.0);
+
+    // initial position (right hand)
     q_right_state_.resize(7);
     q_right_state_ << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
     R_right_state_.setIdentity();
@@ -46,6 +49,12 @@ HandManager::HandManager(ros::NodeHandle *n) :
     
     // Initialize finger control
     finger_control_ = std::make_unique<FingerControl>(n);
+    
+    // initial position (left hand)
+    q_left_state_.resize(7);
+    q_left_state_ << 10*M_PI/180.0, 10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    R_left_state_.setIdentity();
+    left_state_init_ = true;
 
     // ROS Communication Setup
     trajectory_data_pub = n->advertise<std_msgs::Int32MultiArray>("jointdata/qc", 100);
@@ -57,7 +66,6 @@ HandManager::HandManager(ros::NodeHandle *n) :
     move_hand_single_service = n->advertiseService("move_hand_single_srv", &HandManager::single_hand, this);
     move_hand_both_service = n->advertiseService("move_hand_both_srv", &HandManager::both_hands, this);
     grip_online_service = n->advertiseService("grip_online_srv", &HandManager::grip_online, this);
-    home_service = n->advertiseService("home_srv", &HandManager::home, this);
     set_target_class_service = n->advertiseService("set_target_class_srv", &HandManager::setTargetClassService, this);
     head_track_service = n->advertiseService("head_track_srv", &HandManager::head_track_handler, this);
     teleoperation_service = n->advertiseService("teleoperation_srv", &HandManager::teleoperation_handler, this);
@@ -65,9 +73,9 @@ HandManager::HandManager(ros::NodeHandle *n) :
     move_hand_relative_service_  = n->advertiseService("move_hand_relative_srv",  &HandManager::move_hand_relative_handler, this);
     move_hand_keyboard_service_  = n->advertiseService("move_hand_keyboard_srv",  &HandManager::move_hand_keyboard_handler, this);
     move_hand_general_service_   = n->advertiseService("move_hand_general_srv",   &HandManager::move_hand_general_handler, this);
-    
-    // Finger control services
-    finger_control_service_ = n->advertiseService("finger_control_srv", &HandManager::fingerControlService, this);
+    hand_keyboard_sub_           = n->subscribe("/keyboard_command", 10, &HandManager::hand_keyboard_callback, this);
+    arm_back_to_home_service_    = n->advertiseService("arm_back_to_home_srv",    &HandManager::arm_back_to_home_handler, this);
+    finger_control_service_  = n->advertiseService("finger_control_srv", &HandManager::fingerControlService, this);
     finger_scenario_service_ = n->advertiseService("finger_scenario_srv", &HandManager::fingerScenarioService, this);
 }
 
@@ -159,7 +167,7 @@ MatrixXd HandManager::scenario_target(HandType type, string scenario, int i, Vec
         R_target = hand_func.rot(2, -65 * M_PI / 180, 3);
     } else if (scenario == "respect") {
         r_middle = (type == RIGHT) ? Vector3d(0.3, -0.1, -0.3) : Vector3d(0.3, 0.1, -0.3);
-        r_target = (type == RIGHT) ? Vector3d(0.25, 0.2, -0.3) : Vector3d(0.3, -0.1, -0.3);
+        r_target = (type == RIGHT) ? Vector3d(0.25, 0.2, -0.3) : Vector3d(0.25, -0.2, -0.3);
         double rot_angle = (type == RIGHT) ? 60 * M_PI / 180 : -60 * M_PI / 180;
         R_target = hand_func.rot(2, -80 * M_PI / 180, 3) * hand_func.rot(1, rot_angle, 3);
     } else if (scenario == "byebye") {
@@ -270,7 +278,7 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
     */
     vector<double> q_motor(29, 0.0);
     vector<double> q_gazebo(29, 0.0);
-    
+
     if (!simulation) {
         // Right hand motors (indices 12-15)
         q_motor[12] = int(q_rad_right(0) * encoderResolution[0] * harmonicRatio[0] / (2 * M_PI));
@@ -314,7 +322,10 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
             trajectory_data.data.push_back(q_motor[i]); 
         }
         trajectory_data_pub.publish(trajectory_data);
-        // cout << q_motor[12] << ',' << q_motor[13] << ',' << q_motor[14] << ',' << q_motor[15] << ','<< q_motor[23] << ','<< q_motor[24] << ','<< q_motor[25] <<endl;
+        // cout << "robot_right" << ", " << q_motor[12] << ", " << q_motor[13] << ", " << q_motor[14] << ", " << q_motor[15] << ", " << q_motor[23] << ", " << q_motor[24] << ", " << q_motor[25] << endl;
+        // cout << "robot_left" << ", " << q_motor[16] << ", " << q_motor[17] << ", " << q_motor[18] << ", " << q_motor[19] << ", " << q_motor[26] << ", " << q_motor[27] << ", " << q_motor[28] << endl;
+        last_q_motor = q_motor;
+        
     } else { // simulation
         // Right hand joints
         q_gazebo[12] = q_rad_right(0);  
@@ -349,81 +360,179 @@ void HandManager::publishMotorData(const VectorXd& q_rad_right, const VectorXd& 
             joint_angles_gazebo_.data.push_back(q_gazebo[i]);
         }
         gazeboJointStatePub_.publish(joint_angles_gazebo_);
+        // cout << "gazebo_sim" << ", " << q_gazebo[12] << ", " << q_gazebo[13] << ", " << q_gazebo[14] << ", " << q_gazebo[15] << ", " << q_gazebo[23] << ", " << q_gazebo[24] << ", " << q_gazebo[25] << endl;
     }
 }
 
 // --- Service Handler Implementations ---
-bool HandManager::single_hand(hand_planner::move_hand_single::Request &req, hand_planner::move_hand_single::Response &res) {
+bool HandManager::single_hand(hand_planner::move_hand_single::Request &req,
+                              hand_planner::move_hand_single::Response &res)
+{
     ros::Rate rate_(rate);
-    int M = req.t_total / T;
-    VectorXd ee_pos = Vector3d::Zero();
-    HandType type = (req.mode == "righthand") ? RIGHT : LEFT;
+    int M = std::max(1, (int)std::floor(req.t_total / T));
+    Eigen::VectorXd ee_pos = Eigen::Vector3d::Zero();
+    HandType type;
+    if (req.mode == "righthand"){
+        type = RIGHT;
+    }
+    else if (req.mode == "lefthand"){
+        type = LEFT;
+    }
+    else {
+        ROS_ERROR("Invalid mode: %s (must be 'righthand' or 'lefthand')", req.mode.c_str());
+        return false;
+    }
+
     if (type == RIGHT) {
+        if (q_right_state_.size() == 7) q_ra = q_right_state_;
+        else {
+            q_ra.resize(7);
+            q_ra << 10.0*M_PI/180.0, -10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+        }
+        q_init_r = q_ra;
+
+        if (q_right_baseline_.size() != 7) q_right_baseline_ = q_init_r;
+
+        hand_func_R.HO_FK_palm(q_ra);
+        next_ini_ee_posR = hand_func_R.r_palm;
+
         for (int i = 0; i < req.scen_count; i++) {
-            MatrixXd result = scenario_target(RIGHT, req.scenario[i], i, ee_pos, req.ee_ini_pos);
+            Eigen::MatrixXd result = scenario_target(RIGHT, req.scenario[i], i, ee_pos, "prev");
             ee_pos = reach_target(hand_func_R, q_ra, qref_r, sum_r, q_init_r, result, req.scenario[i], M);
         }
-    } else {
+
+        for (int id = 0; id < qref_r.cols(); ++id) {
+            Eigen::VectorXd q_abs  = q_init_r + qref_r.col(id);
+            Eigen::VectorXd q_send = q_abs;
+            q_send.head(4) = q_abs.head(4) - q_right_baseline_.head(4);
+            Eigen::VectorXd q_left = Eigen::VectorXd::Zero(7);
+            Eigen::Vector3d head_angles(0,0,0);
+            publishMotorData(q_send, q_left, head_angles);
+            ros::spinOnce();
+            rate_.sleep();
+        }
+
+        if (qref_r.cols() > 0) q_right_state_ = q_init_r + qref_r.col(qref_r.cols()-1);
+        else q_right_state_ = q_ra;
+
+        sum_r = 0;
+        next_ini_ee_posR = ee_pos;
+        res.ee_fnl_pos = req.scenario[req.scen_count - 1];
+        return true;
+    } 
+    else if (type == LEFT)
+    {
+        if (q_left_state_.size() == 7) q_la = q_left_state_;
+        else {
+            q_la.resize(7);
+            q_la << 10.0*M_PI/180.0, 10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+        }
+        q_init_l = q_la;
+
+        if (q_left_baseline_.size() != 7) q_left_baseline_ = q_init_l;
+
+        hand_func_L.HO_FK_palm(q_la);
+        next_ini_ee_posL = hand_func_L.r_palm;
+
         for (int i = 0; i < req.scen_count; i++) {
-            MatrixXd result = scenario_target(LEFT, req.scenario[i], i, ee_pos, req.ee_ini_pos);
+            Eigen::MatrixXd result = scenario_target(LEFT, req.scenario[i], i, ee_pos, "prev");
             ee_pos = reach_target(hand_func_L, q_la, qref_l, sum_l, q_init_l, result, req.scenario[i], M);
         }
-    }
 
-    for (int id = 0; id < M; ++id) {
-        if (type == RIGHT) {
-            VectorXd q_rad = qref_r.col(id);
-            VectorXd q_rad_left = VectorXd::Zero(7);
-            Vector3d head_angles(0, 0, 0);
-            publishMotorData(q_rad, q_rad_left, head_angles);
-        } else {
-            VectorXd q_rad_right = VectorXd::Zero(7);
-            VectorXd q_rad = qref_l.col(id);
-            Vector3d head_angles(0, 0, 0);
-            publishMotorData(q_rad_right, q_rad, head_angles);
+        for (int id = 0; id < qref_l.cols(); ++id) {
+            Eigen::VectorXd q_abs_l  = q_init_l + qref_l.col(id);
+            Eigen::VectorXd q_send_l = q_abs_l;
+            q_send_l.head(4) = q_abs_l.head(4) - q_left_baseline_.head(4);
+
+            Eigen::VectorXd q_right = Eigen::VectorXd::Zero(7);
+            Eigen::Vector3d head_angles(0,0,0);
+            publishMotorData(q_right, q_send_l, head_angles);
+            ros::spinOnce();
+            rate_.sleep();
         }
-        ros::spinOnce();
-        rate_.sleep();
-    }
 
-    sum_r = 0; sum_l = 0;
-    if (type == RIGHT) { 
-        next_ini_ee_posR = ee_pos; } 
-    else { 
-        next_ini_ee_posL = ee_pos; }
-    res.ee_fnl_pos = req.scenario[req.scen_count - 1];
-    return true;
+        if (qref_l.cols() > 0) q_left_state_ = q_init_l + qref_l.col(qref_l.cols()-1);
+        else q_left_state_ = q_la;
+
+        sum_l = 0;
+        next_ini_ee_posL = ee_pos;
+        res.ee_fnl_pos = req.scenario[req.scen_count - 1];
+        return true;
+    }
 }
+
 
 bool HandManager::both_hands(hand_planner::move_hand_both::Request &req, hand_planner::move_hand_both::Response &res) {
     ros::Rate rate_(rate);
-    int M = req.t_total / T;
-    VectorXd ee_pos_r = Vector3d::Zero();
-    VectorXd ee_pos_l = Vector3d::Zero();
+    int M_req = std::max(1, (int)std::floor(req.t_total / T));
+    Eigen::VectorXd ee_pos_r = Eigen::Vector3d::Zero();
+    Eigen::VectorXd ee_pos_l = Eigen::Vector3d::Zero();
+
+    // init RIGHT from last absolute state (or defaults)
+    if (q_right_state_.size() == 7) q_ra = q_right_state_;
+    else {
+        q_ra.resize(7);
+        q_ra << 10.0*M_PI/180.0, -10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+    }
+    q_init_r = q_ra;
+    if (q_right_baseline_.size() != 7) q_right_baseline_ = q_init_r;
+    hand_func_R.HO_FK_palm(q_ra);
+    next_ini_ee_posR = hand_func_R.r_palm;
+
+    // init LEFT from last absolute state (or defaults)
+    if (q_left_state_.size() == 7) q_la = q_left_state_;
+    else {
+        q_la.resize(7);
+        q_la << 10.0*M_PI/180.0, 10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+    }
+    q_init_l = q_la;
+    if (q_left_baseline_.size() != 7) q_left_baseline_ = q_init_l;
+    hand_func_L.HO_FK_palm(q_la);
+    next_ini_ee_posL = hand_func_L.r_palm;
 
     // --- Trajectory Generation Phase ---
-    // Generate trajectory for the right hand
     for (int i = 0; i < req.scenR_count; i++) {
-        MatrixXd result_r = scenario_target(RIGHT, req.scenarioR[i], i, ee_pos_r, req.ee_ini_posR);
-        ee_pos_r = reach_target(hand_func_R, q_ra, qref_r, sum_r, q_init_r, result_r, req.scenarioR[i], M);
+        Eigen::MatrixXd result_r = scenario_target(RIGHT, req.scenarioR[i], i, ee_pos_r, "prev");
+        ee_pos_r = reach_target(hand_func_R, q_ra, qref_r, sum_r, q_init_r, result_r, req.scenarioR[i], M_req);
     }
-    // Generate trajectory for the left hand
     for (int i = 0; i < req.scenL_count; i++) {
-        MatrixXd result_l = scenario_target(LEFT, req.scenarioL[i], i, ee_pos_l, req.ee_ini_posL);
-        ee_pos_l = reach_target(hand_func_L, q_la, qref_l, sum_l, q_init_l, result_l, req.scenarioL[i], M);
+        Eigen::MatrixXd result_l = scenario_target(LEFT, req.scenarioL[i], i, ee_pos_l, "prev");
+        ee_pos_l = reach_target(hand_func_L, q_la, qref_l, sum_l, q_init_l, result_l, req.scenarioL[i], M_req);
     }
+
+    int Mr = qref_r.cols();
+    int Ml = qref_l.cols();
+    int M  = std::max(Mr, Ml);
 
     // --- Execution Phase ---
     for (int id = 0; id < M; ++id) {
-        VectorXd q_rad_r = qref_r.col(id);
-        VectorXd q_rad_l = qref_l.col(id);
-        Vector3d head_angles(0, 0, 0);
-        publishMotorData(q_rad_r, q_rad_l, head_angles);
+        Eigen::VectorXd q_send_r = Eigen::VectorXd::Zero(7);
+        Eigen::VectorXd q_send_l = Eigen::VectorXd::Zero(7);
+
+        if (id < Mr) {
+            Eigen::VectorXd q_abs_r = q_init_r + qref_r.col(id);
+            q_send_r = q_abs_r;
+            q_send_r.head(4) = q_abs_r.head(4) - q_right_baseline_.head(4);
+        }
+        if (id < Ml) {
+            Eigen::VectorXd q_abs_l = q_init_l + qref_l.col(id);
+            q_send_l = q_abs_l;
+            q_send_l.head(4) = q_abs_l.head(4) - q_left_baseline_.head(4);
+        }
+
+        Eigen::Vector3d head_angles(0, 0, 0);
+        publishMotorData(q_send_r, q_send_l, head_angles);
         ros::spinOnce();
         rate_.sleep();
     }
 
-    // --- Cleanup and Service Response ---
+    // --- Persist last absolute states for next services ---
+    if (Mr > 0) q_right_state_ = q_init_r + qref_r.col(Mr-1);
+    else        q_right_state_ = q_ra;
+
+    if (Ml > 0) q_left_state_  = q_init_l + qref_l.col(Ml-1);
+    else        q_left_state_  = q_la;
+
     sum_r = 0;
     sum_l = 0;
     next_ini_ee_posR = ee_pos_r;
@@ -434,18 +543,19 @@ bool HandManager::both_hands(hand_planner::move_hand_both::Request &req, hand_pl
     return true;
 }
 
-bool HandManager::home(hand_planner::home_service::Request &req, hand_planner::home_service::Response &res) {
-    ROS_WARN("Home service is not fully implemented yet.");
-    return true;
-}
+
 
 bool HandManager::grip_online(hand_planner::gripOnline::Request &req, hand_planner::gripOnline::Response &res) {
     ros::Rate rate_(rate);
-    VectorXd current_q_ra(7);
-    current_q_ra << q_right_state_;
-    VectorXd initial_q_ra = current_q_ra;
 
-    Matrix3d R_target_r = Matrix3d::Identity();
+    Eigen::VectorXd current_q_ra(7);
+    Eigen::VectorXd q(7);
+    if (q_right_state_.size()==7) q = q_right_state_;
+    else q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    
+    current_q_ra = q;
+    Eigen::VectorXd initial_q_ra = current_q_ra;
+    Eigen::Matrix3d R_target_r = Matrix3d::Identity();
 
     t_grip = 0;
     while (t_grip <= (120)) {
@@ -539,39 +649,54 @@ bool HandManager::teleoperation_handler(std_srvs::Empty::Request &req, std_srvs:
     return true;
 }
 
-
-bool HandManager::write_string_handler(hand_planner::WriteString::Request &req, hand_planner::WriteString::Response &res) {
+bool HandManager::write_string_handler(hand_planner::WriteString::Request &req,
+                                       hand_planner::WriteString::Response &res)
+{
     VectorXd q(7);
-    q << q_right_state_;
+    if (q_right_state_.size()==7) q = q_right_state_;
+    else q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+
+    if (q_right_baseline_.size()!=7) q_right_baseline_ = q;
 
     Vector3d r_target(0.45, 0.02, 0.03);
     Matrix3d R_target = hand_func_R.rot(2, -140.0*M_PI/180.0, 3)
                       * hand_func_R.rot(1,  -25.0*M_PI/180.0, 3)
                       * hand_func_R.rot(3,   30.0*M_PI/180.0, 3);
 
-    auto pub = [&](const VectorXd& qr){
+    auto pub = [&](const VectorXd& q_abs){
+        VectorXd q_send = q_abs;
+        q_send.head(4) = q_abs.head(4) - q_right_baseline_.head(4);
         VectorXd ql = VectorXd::Zero(7);
-        publishMotorData(qr, ql, Vector3d(0,0,0));
+        publishMotorData(q_send, ql, Vector3d(0,0,0));
     };
 
     if (!approachWhiteboard(hand_func_R, coef_generator, q, r_target, R_target, T, pub)) { res.success=false; return true; }
     writeStringCore(hand_func_R, q, req.data, r_target, R_target, T, pub);
-    res.success = true;
+
     q_right_state_ = q;
+    res.success = true;
     return true;
 }
 
-bool HandManager::move_hand_relative_handler(hand_planner::PickAndMove::Request &req, hand_planner::PickAndMove::Response &res) {
+
+bool HandManager::move_hand_relative_handler(hand_planner::PickAndMove::Request &req,
+                                             hand_planner::PickAndMove::Response &res)
+{
     VectorXd q(7);
-    q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    if (q_right_state_.size()==7) q = q_right_state_;
+    else q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+
+    if (q_right_baseline_.size()!=7) q_right_baseline_ = q;
 
     Matrix3d R_pick = hand_func_R.rot(2, -100.0*M_PI/180.0, 3);
     Vector3d mid(0.15, -0.15, -0.30);
     Vector3d goal(0.35, -0.10, -0.20);
 
-    auto pub = [&](const VectorXd& qr){
+    auto pub = [&](const VectorXd& q_abs){
+        VectorXd q_send = q_abs;
+        q_send.head(4) = q_abs.head(4) - q_right_baseline_.head(4);
         VectorXd ql = VectorXd::Zero(7);
-        publishMotorData(qr, ql, Vector3d(0,0,0));
+        publishMotorData(q_send, ql, Vector3d(0,0,0));
     };
 
     if (!approachViaOneMid(hand_func_R, coef_generator, q, mid, goal, R_pick, 3.0, 3.0, T, pub)) {
@@ -591,183 +716,119 @@ bool HandManager::move_hand_relative_handler(hand_planner::PickAndMove::Request 
         if (ax=='X'){ d = std::max(std::min(d, MAX_DX), -MAX_DX); dxyz(0)=d; }
         else if (ax=='Y'){ d = std::max(std::min(d, MAX_DYZ), -MAX_DYZ); dxyz(1)=d; }
         else { d = std::max(std::min(d, MAX_DYZ), -MAX_DYZ); dxyz(2)=d; }
-        if (!moveRelative(hand_func_R, coef_generator, q, dxyz, goal, R_pick, dur, T, pub)) { res.ok=false; res.message="move failed"; return true; }
+
+        if (!moveRelative(hand_func_R, coef_generator, q, dxyz, goal, R_pick, dur, T, pub)) {
+            res.ok=false; res.message="move failed"; return true;
+        }
     }
 
-    res.ok=true; res.message="ok";
     q_right_state_ = q;
+    res.ok=true; res.message="ok";
     return true;
 }
+
+
+void HandManager::hand_keyboard_callback(const std_msgs::Int32::ConstPtr& msg)
+{
+    if (!hand_keyboard_enabled_) return;
+    const double STEP_T = 1.0;
+    const double MAX_DX = 0.08, MAX_DYZ = 0.30;
+
+    int code = msg->data;
+    double dx=0, dy=0, dz=0;
+    switch (code) {
+        case 'w': case 'W': dx = +0.05; break; // Forward
+        case 's': case 'S': dx = -0.05; break; // Backward
+        case 'e': case 'E': dy = +0.10; break; // To the left
+        case 'd': case 'D': dy = -0.10; break; // To the right
+        case 'q': case 'Q': dz = +0.10; break; // Upward
+        case 'a': case 'A': dz = -0.10; break; // Downward
+        default: return;
+    }
+
+    if (q_right_state_.size()!=7) return;
+    if (dx!=0) dx = std::max(std::min(dx,  MAX_DX),  -MAX_DX);
+    if (dy!=0) dy = std::max(std::min(dy,  MAX_DYZ), -MAX_DYZ);
+    if (dz!=0) dz = std::max(std::min(dz,  MAX_DYZ), -MAX_DYZ);
+
+    Eigen::VectorXd q = q_right_state_;
+    hand_func_R.HO_FK_palm(q);
+    Eigen::Vector3d r0 = hand_func_R.r_palm;
+    Eigen::Vector3d goal = r0 + Eigen::Vector3d(dx,dy,dz);
+    Eigen::Matrix3d Rg = hand_func_R.rot(2, -100.0*M_PI/180.0, 3);
+
+    auto pub = [&](const Eigen::VectorXd& qr){
+        Eigen::VectorXd ql = Eigen::VectorXd::Zero(7);
+        publishMotorData(qr, ql, Eigen::Vector3d(0,0,0));
+    };
+
+    if (!moveRelative(hand_func_R, coef_generator, q,
+                      Eigen::Vector3d(dx,dy,dz), goal, Rg,
+                      STEP_T, T, pub))
+    {
+        ROS_WARN("keyboard step failed");
+        return;
+    }
+
+    q_right_state_ = q;
+    hand_keyboard_last_input_ = ros::WallTime::now();
+}
+
+
 
 bool HandManager::move_hand_keyboard_handler(hand_planner::KeyboardJog::Request &req,
                                              hand_planner::KeyboardJog::Response &res)
 {
-    VectorXd q(7);
-    q << q_right_state_;
-    S5_hand& H = hand_func_R;
-    H.HO_FK_palm(q);
+    Eigen::VectorXd q(7);
+    if (q_right_state_.size()==7) q = q_right_state_;
+    else q << 10*M_PI/180.0, -10*M_PI/180.0, 0, -25*M_PI/180.0, 0, 0, 0;
+    Eigen::Vector3d mid(0.15, -0.15, -0.30);
+    Eigen::Vector3d goal(0.35, -0.10, -0.20);
+    Eigen::Matrix3d Rg = hand_func_R.rot(2, -100.0*M_PI/180.0, 3);
 
-    {
-        Eigen::Vector3d mid(0.15, -0.15, -0.30);
-        Eigen::Vector3d goal(0.35, -0.10, -0.20);
-        Matrix3d Rg = H.rot(2, -100.0*M_PI/180.0, 3);
-        double T1 = 3.0, T2 = 3.0;
-        MinimumJerkInterpolation mj;
-        MatrixXd t(1,3); t<<0.0, T1, T1+T2;
-
-        H.HO_FK_palm(q);
-        Vector3d r0 = H.r_palm;
-        MatrixXd Px(1,3),Py(1,3),Pz(1,3); Px<<r0(0),mid(0),goal(0); Py<<r0(1),mid(1),goal(1); Pz<<r0(2),mid(2),goal(2);
-        const double INF = std::numeric_limits<double>::infinity();
-        MatrixXd Vx(1,3),Vy(1,3),Vz(1,3),Ax(1,3),Ay(1,3),Az(1,3);
-        Vx<<0,INF,0; Vy<<0,INF,0; Vz<<0,INF,0; Ax<<0,INF,0; Ay<<0,INF,0; Az<<0,INF,0;
-        MatrixXd ord(1,2); ord.fill(5);
-        MatrixXd conx(3,3),cony(3,3),conz(3,3); conx<<Px,Vx,Ax; cony<<Py,Vy,Ay; conz<<Pz,Vz,Az;
-
-        MatrixXd Xc = mj.Coefficient1(t, ord, conx, 0.1).transpose();
-        MatrixXd Yc = mj.Coefficient1(t, ord, cony, 0.1).transpose();
-        MatrixXd Zc = mj.Coefficient1(t, ord, conz, 0.1).transpose();
-
-        ros::Rate rate_(rate);
-        for (double tt=0; tt<(T1+T2); tt+=T) {
-            int seg = (tt < T1) ? 0 : 1;
-            Vector3d V(
-                mj.GetAccVelPos(Xc.row(seg), tt, 0, 5)(0,1),
-                mj.GetAccVelPos(Yc.row(seg), tt, 0, 5)(0,1),
-                mj.GetAccVelPos(Zc.row(seg), tt, 0, 5)(0,1)
-            );
-            H.update_hand(q, V, goal, Rg);
-            H.doQP(q);
-            q = H.q_next;
-
-            VectorXd qL = VectorXd::Zero(7);
-            Vector3d head(0,0,0);
-            publishMotorData(q, qL, head);
-
-            ros::spinOnce();
-            rate_.sleep();
-        }
-    }
-
-    termios oldt; bool tty_ok=false;
-    {
-        if (tcgetattr(STDIN_FILENO, &oldt) == 0) {
-            termios newt = oldt; newt.c_lflag &= ~(ICANON | ECHO);
-            tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-            int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
-            fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
-            tty_ok = true;
-        }
-    }
-
-    auto restoreTTY = [&](){
-        if (tty_ok) tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    auto pub = [&](const Eigen::VectorXd& qr){
+        Eigen::VectorXd ql = Eigen::VectorXd::Zero(7);
+        publishMotorData(qr, ql, Eigen::Vector3d(0,0,0));
     };
 
-    ros::Rate rate_(rate);
-    ros::WallTime last_input = ros::WallTime::now();
-    const double STEP_T = 1.0; 
-    const double MAX_DX = 0.08;      
-    const double MAX_DYZ = 0.30;   
-
-    auto doRelative = [&](double dx, double dy, double dz, double dur){
-        H.HO_FK_palm(q);
-        Vector3d r0 = H.r_palm;
-        MinimumJerkInterpolation mj;
-
-        MatrixXd t(1,2); t<<0.0, dur;
-        MatrixXd Px(1,2),Py(1,2),Pz(1,2);
-        Px<<r0(0), r0(0)+dx;
-        Py<<r0(1), r0(1)+dy;
-        Pz<<r0(2), r0(2)+dz;
-
-        MatrixXd Vx(1,2),Vy(1,2),Vz(1,2),Ax(1,2),Ay(1,2),Az(1,2);
-        Vx<<0,0; Vy<<0,0; Vz<<0,0; Ax<<0,0; Ay<<0,0; Az<<0,0;
-        MatrixXd ord(1,1); ord.fill(5);
-        MatrixXd conx(3,2), cony(3,2), conz(3,2); conx<<Px,Vx,Ax; cony<<Py,Vy,Ay; conz<<Pz,Vz,Az;
-
-        MatrixXd Xc = mj.Coefficient1(t, ord, conx, 0.1).transpose();
-        MatrixXd Yc = mj.Coefficient1(t, ord, cony, 0.1).transpose();
-        MatrixXd Zc = mj.Coefficient1(t, ord, conz, 0.1).transpose();
-
-        Vector3d goal = r0 + Vector3d(dx,dy,dz);
-        Matrix3d Rg   = H.rot(2, -100.0*M_PI/180.0, 3);
-
-        for (double tt=0; tt<dur; tt+=T) {
-            Vector3d V(
-                mj.GetAccVelPos(Xc.row(0), tt, 0, 5)(0,1),
-                mj.GetAccVelPos(Yc.row(0), tt, 0, 5)(0,1),
-                mj.GetAccVelPos(Zc.row(0), tt, 0, 5)(0,1)
-            );
-
-            H.update_hand(q, V, goal, Rg);
-            H.doQP(q);
-            q = H.q_next;
-
-            VectorXd qL = VectorXd::Zero(7);
-            Vector3d head(0,0,0);
-            publishMotorData(q, qL, head);
-
-            ros::spinOnce();
-            rate_.sleep();
-        }
-    };
-
-    ROS_INFO("keyboard: W/S => Z+/Z- , D/A => Y+/Y- , E/Q => X+/X- , X => exit");
-    bool exit_to_home = false;
-
-    while (ros::ok()) {
-        if ( (ros::WallTime::now() - last_input).toSec() > 60.0 ){
-            exit_to_home = true;
-            break;
-        }
-
-        fd_set set; FD_ZERO(&set); FD_SET(STDIN_FILENO, &set);
-        timeval tv{0, 50000}; // 50ms
-        int rv = select(STDIN_FILENO+1, &set, NULL, NULL, &tv);
-        if (rv > 0 && FD_ISSET(STDIN_FILENO, &set)) {
-            char ch=0;
-            if (read(STDIN_FILENO, &ch, 1) == 1) {
-                double dx=0, dy=0, dz=0; bool end=false, valid=false;
-                switch (ch) {
-                    case 'w': case 'W': dz = +0.10; valid=true; break; // Upward
-                    case 's': case 'S': dz = -0.10; valid=true; break; // Downward
-                    case 'd': case 'D': dy = +0.10; valid=true; break; // To the left
-                    case 'a': case 'A': dy = -0.10; valid=true; break; // To the right
-                    case 'e': case 'E': dx = +0.05; valid=true; break; // Forward
-                    case 'q': case 'Q': dx = -0.05; valid=true; break; // Backward
-                    case 'x': case 'X': end=true; break;
-                    default: break;
-                }
-                if (end) { restoreTTY(); res.ok=true; res.message="exit"; return true; }
-                if (valid) {
-                    if (dx!=0) dx = std::max(std::min(dx,  MAX_DX),  -MAX_DX);
-                    if (dy!=0) dy = std::max(std::min(dy,  MAX_DYZ), -MAX_DYZ);
-                    if (dz!=0) dz = std::max(std::min(dz,  MAX_DYZ), -MAX_DYZ);
-                    doRelative(dx,dy,dz, STEP_T);
-                    last_input = ros::WallTime::now();
-                }
-            }
-        }
-        ros::spinOnce();
+    if (!approachViaOneMid(hand_func_R, coef_generator, q, mid, goal, Rg, 3.0, 3.0, T, pub)) {
+        res.ok=false; res.message="approach failed";
+        return true;
     }
 
-    restoreTTY();
-    res.ok = true; res.message = "timeout";
     q_right_state_ = q;
+
+    hand_keyboard_enabled_ = true;
+    hand_keyboard_last_input_ = ros::WallTime::now();
+    res.ok = true; 
+    res.message = "ready: use keyboard teleop (r/f/t/g/y/h)";
     return true;
 }
 
 bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Request &req,
                                             hand_planner::MoveHandGeneral::Response &res)
 {
-    VectorXd q(7); 
-    q << q_right_state_;
-    const VectorXd q_init = q;
+    using Eigen::Vector3d;
+    using Eigen::VectorXd;
+    using Eigen::Matrix3d;
 
-    auto pub = [&](const VectorXd& qr){
+    VectorXd q(7);
+    if (q_right_state_.size() == 7) {
+        q = q_right_state_;
+    } else {
+        q.resize(7);
+        q << 10.0*M_PI/180.0, -10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+    }
+
+    if (q_right_baseline_.size() != 7) {
+        q_right_baseline_ = q;
+    }
+
+    auto pub = [&](const VectorXd& q_abs){
+        VectorXd q_send = q_abs;
+        q_send.head(4) = q_abs.head(4) - q_right_baseline_.head(4);
         VectorXd ql = VectorXd::Zero(7);
-        publishMotorData(qr, ql, Vector3d(0,0,0));
+        publishMotorData(q_send, ql, Vector3d(0,0,0));
     };
 
     const double T1 = 3.0, T2 = 3.0;
@@ -789,31 +850,42 @@ bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Reque
         std::string mode; 
         if (!(iss >> mode)) continue;
 
-        std::vector<double> vals; double tmp;
+        std::vector<double> vals; 
+        double tmp; 
         while (iss >> tmp) vals.push_back(tmp);
 
-        bool is_abs = (mode=="abs" || mode=="ABS" || mode=="Abs");
-        bool is_rel = (mode=="rel" || mode=="REL" || mode=="Rel");
-        if (!is_abs && !is_rel) continue;
+        bool is_abs = (mode=="abs" || mode=="ABS");
 
-        double mx=0,my=0,mz=0, gx=0,gy=0,gz=0, rx=0,ry=0,rz=0;
+        double mx=0, my=0, mz=0, gx=0, gy=0, gz=0, rx=0, ry=0, rz=0;
+        bool have_mid = false;
+
         if (is_abs) {
-            if (vals.size() != 9) { res.ok=false; res.message="abs needs 9 values"; return true; }
-            mx = vals[0]; my = vals[1]; mz = vals[2];
-            gx = vals[3]; gy = vals[4]; gz = vals[5];
-            rx = vals[6]; ry = vals[7]; rz = vals[8];
-        } else { // rel
-            if (vals.size() != 6) { res.ok=false; res.message="rel needs 6 values"; return true; }
+            if (vals.size() == 9) {
+                have_mid = true;
+                mx = vals[0]; my = vals[1]; mz = vals[2];
+                gx = vals[3]; gy = vals[4]; gz = vals[5];
+                rx = vals[6]; ry = vals[7]; rz = vals[8];
+            } else if (vals.size() == 6) {
+                have_mid = false;
+                gx = vals[0]; gy = vals[1]; gz = vals[2];
+                rx = vals[3]; ry = vals[4]; rz = vals[5];
+            } else {
+                continue;
+            }
+        } else {
+            if (vals.size() != 6) continue;
             gx = vals[0]; gy = vals[1]; gz = vals[2];
             rx = vals[3]; ry = vals[4]; rz = vals[5];
         }
 
         hand_func_R.HO_FK_palm(q);
         Vector3d r0 = hand_func_R.r_palm;
+        Matrix3d R0 = hand_func_R.R_palm.block<3,3>(0,0);
 
         const double RX = rx * M_PI/180.0;
         const double RY = ry * M_PI/180.0;
         const double RZ = rz * M_PI/180.0;
+
         Matrix3d R_inc = hand_func_R.rot(2, RY, 3)
                        * hand_func_R.rot(1, RX, 3)
                        * hand_func_R.rot(3, RZ, 3);
@@ -823,42 +895,95 @@ bool HandManager::move_hand_general_handler(hand_planner::MoveHandGeneral::Reque
 
         if (is_abs) {
             r_goal = Vector3d(gx, gy, gz);
-            mid    = Vector3d(mx, my, mz);
-            R_goal = R_inc;
+            mid    = have_mid ? Vector3d(mx, my, mz) : 0.5*(r0 + r_goal);
+            R_goal = R_inc;                
         } else {
             r_goal = r0 + Vector3d(gx, gy, gz);
-
-            mid = 0.5 * (r0 + r_goal);
-            mid(1) -= 0.10;
-
-            Matrix3d R0;
-            if (hand_func_R.R_palm.rows()==3 && hand_func_R.R_palm.cols()==3) {
-                R0 = hand_func_R.R_palm;
-            } else {
-                R0 = hand_func_R.R_palm.block<3,3>(0,0);
-            }
-            R_goal = R0 * R_inc;
+            mid    = 0.5*(r0 + r_goal);   
+            R_goal = R0 * R_inc;          
         }
 
-        ROS_INFO_STREAM("[move_hand_general rel/abs] r0="   << r0.transpose()
-                         << " mid="   << mid.transpose()
-                         << " goal="  << r_goal.transpose());
-
         if (!approachViaOneMid(hand_func_R, coef_generator, q, mid, r_goal, R_goal, T1, T2, T, pub)) {
-            res.ok = false; res.message = "approach failed";
-            if (req.go_home_on_finish) goHome(hand_func_R, q, q_init, 5.0, T, pub);
+            res.ok = false; 
+            res.message = "approach failed";
+            q_right_state_ = q;
             return true;
         }
     }
 
-    if (req.go_home_on_finish) {
-        goHome(hand_func_R, q, q_init, 5.0, T, pub);
-        res.ok = true; res.message = user_exit ? "exit-home" : "done-home";
-    } else {
-        res.ok = true; res.message = user_exit ? "exit" : "done";
+    q_right_state_ = q;
+    res.ok = true; 
+    res.message = user_exit ? "exit" : "done";
+    return true;
+}
+
+bool HandManager::arm_back_to_home_handler(hand_planner::arm_back_to_home::Request &req,
+                                           hand_planner::arm_back_to_home::Response &res)
+{
+    ros::Rate rate_(rate);
+
+    // Right init
+    Eigen::VectorXd q_r(7);
+    if (q_right_state_.size()==7) q_r = q_right_state_;
+    else q_r << 10.0*M_PI/180.0, -10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+    if (q_right_baseline_.size()!=7) q_right_baseline_ = q_r;
+
+    Eigen::VectorXd q_target_r = q_r;
+    for (int i=0;i<4;++i) q_target_r(i) = q_right_baseline_(i);
+    q_target_r(4) = 0.0;
+    q_target_r(5) = q_r(5);
+    q_target_r(6) = q_r(6);
+
+    // Left init
+    Eigen::VectorXd q_l(7);
+    if (q_left_state_.size()==7) q_l = q_left_state_;
+    else q_l << 10.0*M_PI/180.0, 10.0*M_PI/180.0, 0.0, -25.0*M_PI/180.0, 0.0, 0.0, 0.0;
+    if (q_left_baseline_.size()!=7) q_left_baseline_ = q_l;
+
+    Eigen::VectorXd q_target_l = q_l;
+    for (int i=0;i<4;++i) q_target_l(i) = q_left_baseline_(i);
+    q_target_l(4) = 0.0;
+    q_target_l(5) = q_l(5);
+    q_target_l(6) = q_l(6);
+
+    // Params
+    const int NUM_ARM_JOINTS_TO_HOME = 5;
+    const double FIXED_HOME_DURATION = 15.0;
+    double segment_duration = FIXED_HOME_DURATION / NUM_ARM_JOINTS_TO_HOME;
+    if (segment_duration <= 0.0) segment_duration = T;
+    int M_segment = static_cast<int>(segment_duration / T);
+    if (M_segment == 0) M_segment = 1;
+
+    Eigen::VectorXd q_work_r = q_r;
+    Eigen::VectorXd q_work_l = q_l;
+
+    auto pub = [&](const Eigen::VectorXd& qr,const Eigen::VectorXd& ql){
+        Eigen::VectorXd q_send_r = qr;
+        q_send_r.head(4) = qr.head(4) - q_right_baseline_.head(4);
+        Eigen::VectorXd q_send_l = ql;
+        q_send_l.head(4) = ql.head(4) - q_left_baseline_.head(4);
+        publishMotorData(q_send_r, q_send_l, Eigen::Vector3d(0,0,0));
+    };
+
+    for (int joint_idx = NUM_ARM_JOINTS_TO_HOME - 1; joint_idx >= 0; --joint_idx) {
+        double start_r = q_work_r(joint_idx);
+        double end_r   = q_target_r(joint_idx);
+        double start_l = q_work_l(joint_idx);
+        double end_l   = q_target_l(joint_idx);
+
+        for (int step = 0; step <= M_segment; ++step) {
+            double a = (M_segment > 0) ? static_cast<double>(step)/M_segment : 1.0;
+            q_work_r(joint_idx) = start_r + (end_r - start_r)*a;
+            q_work_l(joint_idx) = start_l + (end_l - start_l)*a;
+            pub(q_work_r,q_work_l);
+            ros::spinOnce();
+            rate_.sleep();
+        }
     }
 
-    q_right_state_ = q;
+    q_right_state_ = q_work_r;
+    q_left_state_  = q_work_l;
+    res.success = true;
     return true;
 }
 
